@@ -11,7 +11,7 @@ namespace GLPack.DAL
         {
         }
 
-        public DbSet<Account> Companies => Set<Account>();
+        public DbSet<Company> Companies => Set<Company>();
         public DbSet<Account> Accounts => Set<Account>();
         public DbSet<Transaction> Transactions => Set<Transaction>();
         public DbSet<TransactionEntry> TransactionEntries => Set<TransactionEntry>();

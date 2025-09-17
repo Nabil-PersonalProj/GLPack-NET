@@ -1,4 +1,5 @@
 using GLPack.DAL;
+using GLPack.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<ITransactionsService, TransactionsService>();
+builder.Services.AddScoped<IAccountsService, AccountsService>();
+builder.Services.AddScoped<ICompaniesService, CompaniesService>();
 
 var app = builder.Build();
 
@@ -24,6 +28,7 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+app.MapControllers();
 
 app.MapControllerRoute(
     name: "default",
