@@ -15,7 +15,8 @@ namespace GLPack.Services
     public sealed class TransactionsService : ITransactionsService
     {
         private readonly ApplicationDbContext _db;
-        public TransactionsService(ApplicationDbContext db) => _db = db;
+        private readonly IAppLogger _appLogger;
+        public TransactionsService(ApplicationDbContext db, IAppLogger appLogger) {_db = db;_appLogger = appLogger;}
 
         public async Task<Tx.TransactionDto> CreateAsync(Tx.TransactionCreateDto dto, CancellationToken ct)
         {
@@ -36,6 +37,16 @@ namespace GLPack.Services
 
             if (Math.Round(totalDr - totalCr, 2) != 0m)
             {
+                await _appLogger.LogAsync(
+                    eventType: "ERROR",
+                    level: "WARN",
+                    logCode: "TX_UNBALANCED",
+                    logMessage: $"DR={totalDr} CR={totalCr} for txn {dto.TransactionNo}",
+                    companyId: dto.CompanyId,
+                    sourceFile: nameof(TransactionsService),
+                    sourceFunction: nameof(CreateAsync),
+                    ct: ct
+                    );
                 throw new InvalidOperationException("Entries are not balanced (DR != CR).");
             }
 
@@ -86,6 +97,17 @@ namespace GLPack.Services
             _db.TransactionEntries.AddRange(lines);
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
+
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "TX_CREATE_OK",
+                logMessage: $"Created transaction {dto.TransactionNo}",
+                companyId: dto.CompanyId,
+                sourceFile: nameof(TransactionsService),
+                sourceFunction: nameof(CreateAsync),
+                ct: ct
+                );
 
             return new Tx.TransactionDto
             {
@@ -196,7 +218,19 @@ namespace GLPack.Services
             var totalDr = dto.Entries.Where(x => x.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
             var totalCr = dto.Entries.Where(x => x.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
             if (Math.Round(totalDr - totalCr, 2) != 0m)
+            {
+                await _appLogger.LogAsync(
+                    eventType: "ERROR",
+                    level: "WARN",
+                    logCode: "TX_UNBALANCED",
+                    logMessage: $"DR={totalDr} CR={totalCr} for txn {dto.TransactionNo}",
+                    companyId: dto.CompanyId,
+                    sourceFile: nameof(TransactionsService),
+                    sourceFunction: nameof(UpdateAsync),
+                    ct: ct
+                    );
                 throw new InvalidOperationException("Entries are not balanced (DR != CR).");
+            }
 
             // 2) Ensure accounts exist
             var codes = dto.Entries.Select(e => e.AccountCode).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -243,8 +277,18 @@ namespace GLPack.Services
 
             _db.TransactionEntries.AddRange(newLines);
             await _db.SaveChangesAsync(ct);
-
             await tx.CommitAsync(ct);
+
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "TX_UPDATE_OK",
+                logMessage: $"Updated transaction {transactionNo}",
+                companyId: companyId,
+                sourceFile: nameof(TransactionsService),
+                sourceFunction: nameof(UpdateAsync),
+                ct: ct
+                );
 
             // 5) Return DTO
             return new Tx.TransactionDto
@@ -285,10 +329,19 @@ namespace GLPack.Services
 
             _db.Transactions.Remove(header);
             await _db.SaveChangesAsync(ct);
-
             await tx.CommitAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "TX_DELETE_OK",
+                logMessage: $"Deleted transaction {transactionNo}",
+                companyId: companyId,
+                sourceFile: nameof(TransactionsService),
+                sourceFunction: nameof(DeleteAsync),
+                ct: ct
+                );
         }
     }
 
 }
-}
+

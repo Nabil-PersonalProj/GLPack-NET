@@ -15,6 +15,7 @@ namespace GLPack.DAL
         public DbSet<Account> Accounts => Set<Account>();
         public DbSet<Transaction> Transactions => Set<Transaction>();
         public DbSet<TransactionEntry> TransactionEntries => Set<TransactionEntry>();
+        public DbSet<GLPack.Models.AppLog> AppLogs => Set<GLPack.Models.AppLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

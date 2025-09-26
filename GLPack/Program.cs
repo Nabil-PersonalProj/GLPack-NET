@@ -11,6 +11,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<ITransactionsService, TransactionsService>();
 builder.Services.AddScoped<IAccountsService, AccountsService>();
 builder.Services.AddScoped<ICompaniesService, CompaniesService>();
+builder.Services.AddScoped<IAppLogger, AppLogger>();
+
 
 var app = builder.Build();
 
