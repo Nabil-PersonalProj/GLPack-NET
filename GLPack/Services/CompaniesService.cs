@@ -8,13 +8,27 @@ namespace GLPack.Services
     public sealed class CompaniesService : ICompaniesService
     {
         private readonly ApplicationDbContext _db;
-        public CompaniesService(ApplicationDbContext db) => _db = db;
+        private readonly IAppLogger _appLogger;
+        public CompaniesService(ApplicationDbContext db, IAppLogger appLogger)
+        {
+            _db = db;
+            _appLogger = appLogger;
+        }
 
         public async Task<CompanyDto> CreateAsync(CompanyUpsertDto dto, CancellationToken ct)
         {
             var entity = new Company { Name = dto.Name };
             _db.Companies.Add(entity);
             await _db.SaveChangesAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "COMPANY_CREATE_OK",
+                logMessage: $"Created company {entity.Id} '{entity.Name}'",
+                companyId: entity.Id,
+                sourceFile: nameof(CompaniesService),
+                sourceFunction: nameof(CreateAsync),
+                ct: ct);
             return new CompanyDto { Id = entity.Id, Name = entity.Name };
         }
 
@@ -41,6 +55,15 @@ namespace GLPack.Services
             if (c is null) throw new KeyNotFoundException("Company not found.");
             c.Name = dto.Name;
             await _db.SaveChangesAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "COMPANY_UPDATE_OK",
+                logMessage: $"Updated company {id} name='{dto.Name}'",
+                companyId: id,
+                sourceFile: nameof(CompaniesService),
+                sourceFunction: nameof(UpdateAsync),
+                ct: ct);
         }
 
         public async Task DeleteAsync(int id, CancellationToken ct)
@@ -51,10 +74,30 @@ namespace GLPack.Services
 
             // Choose policy: restrict if data exists (safer), or cascade (auto-remove children).
             if (c.Accounts.Any() || c.Transactions.Any())
+            {
+                await _appLogger.LogAsync(
+                    eventType: "ERROR",
+                    level: "WARN",
+                    logCode: "COMPANY_DELETE_BLOCKED",
+                    logMessage: $"Company {id} has Accounts/Transactions",
+                    companyId: id,
+                    sourceFile: nameof(CompaniesService),
+                    sourceFunction: nameof(DeleteAsync),
+                    ct: ct);
                 throw new InvalidOperationException("Company has data; delete accounts/transactions first.");
+            }
 
             _db.Companies.Remove(c);
             await _db.SaveChangesAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "COMPANY_DELETE_OK",
+                logMessage: $"Deleted company {id}",
+                companyId: id,
+                sourceFile: nameof(CompaniesService),
+                sourceFunction: nameof(DeleteAsync),
+                ct: ct);
         }
     }
 }

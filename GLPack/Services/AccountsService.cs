@@ -8,7 +8,12 @@ namespace GLPack.Services
     public class AccountsService : IAccountsService
     {
         private readonly ApplicationDbContext _db;
-        public AccountsService(ApplicationDbContext db) => _db = db;
+        private readonly IAppLogger _appLogger;
+        public AccountsService(ApplicationDbContext db, IAppLogger appLogger)
+        {
+            _db = db;
+            _appLogger = appLogger;
+        }
 
         public async Task<AccountDto?> GetAsync(int companyId, string accountCode, CancellationToken ct)
         {
@@ -55,7 +60,18 @@ namespace GLPack.Services
             // Enforce unique (CompanyId, Code)
             var exists = await _db.Accounts.AnyAsync(a => a.CompanyId == dto.CompanyId && a.Code == dto.AccountCode, ct);
             if (exists)
+            {
+                await _appLogger.LogAsync(
+                    eventType: "ERROR",
+                    level: "WARN",
+                    logCode: "ACCOUNTS_CODE_DUP",
+                    logMessage: $"AccountCode '{dto.AccountCode}' already exists",
+                    companyId: dto.CompanyId,
+                    sourceFile: nameof(AccountsService),
+                    sourceFunction: nameof(CreateAsync),
+                    ct: ct);
                 throw new InvalidOperationException("AccountCode already exists for this company.");
+            }
 
             var entity = new Account
             {
@@ -67,6 +83,15 @@ namespace GLPack.Services
 
             _db.Accounts.Add(entity);
             await _db.SaveChangesAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "ACCOUNTS_CREATE_OK",
+                logMessage: $"Created account {entity.Code}",
+                companyId: entity.CompanyId,
+                sourceFile: nameof(AccountsService),
+                sourceFunction: nameof(CreateAsync),
+                ct: ct);
 
             return new AccountDto
             {
@@ -88,6 +113,15 @@ namespace GLPack.Services
             a.Type = dto.Type;
 
             await _db.SaveChangesAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "ACCOUNTS_UPDATE_OK",
+                logMessage: $"Updated account {accountCode}",
+                companyId: companyId,
+                sourceFile: nameof(AccountsService),
+                sourceFunction: nameof(UpdateAsync),
+                ct: ct);
         }
 
         public async Task DeleteAsync(int companyId, string accountCode, CancellationToken ct)
@@ -96,6 +130,15 @@ namespace GLPack.Services
             if (a is null) return;
             _db.Accounts.Remove(a);
             await _db.SaveChangesAsync(ct);
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "ACCOUNTS_DELETE_OK",
+                logMessage: $"Deleted account {accountCode}",
+                companyId: companyId,
+                sourceFile: nameof(AccountsService),
+                sourceFunction: nameof(DeleteAsync),
+                ct: ct);
         }
     }
 }
