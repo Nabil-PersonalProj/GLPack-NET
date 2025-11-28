@@ -1,50 +1,77 @@
-﻿<!DOCTYPE html>
+﻿@* Views/Shared/_Layout.cshtml *@
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - GLPack</title>
-    <script type="importmap"></script>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/GLPack.styles.css" asp-append-version="true" />
-</head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">GLPack</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] ?? "GLPack")</title>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - GLPack - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+    <!-- Tailwind via CDN -->
+    <script>window.tailwind = { config: { darkMode: 'class' } };</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome (optional) -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+    @RenderSection("head", required: false)
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-neutral-950 text-gray-900 dark:text-neutral-100">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-40 bg-white/80 dark:bg-neutral-900/80 border-b border-gray-200 dark:border-neutral-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <a href="/"
+                   class="inline-flex items-center gap-2 text-sm rounded-lg border px-3 py-1.5
+                          text-gray-700 dark:text-neutral-100 border-gray-200 dark:border-neutral-700">
+                    <i class="fa-solid fa-house"></i>
+                    <span>Home</span>
+                </a>
+                <span class="text-gray-400">/</span>
+                <span class="font-semibold">@ViewData["Breadcrumb"]</span>
+            </div>
+            <div class="flex items-center gap-3 text-sm">
+                @if (User.Identity?.IsAuthenticated ?? false)
+                {
+                    <form asp-controller="UserAccount"
+                          asp-action="Logout"
+                          method="post"
+                          class="m-0">
+                        <button type="submit"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border
+                                           border-gray-200 dark:border-neutral-700
+                                           text-gray-700 dark:text-neutral-100
+                                           hover:bg-gray-100 dark:hover:bg-neutral-800">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span>Logout</span>
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <a asp-controller="Account"
+                       asp-action="Login"
+                       class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border
+                                  border-gray-200 dark:border-neutral-700
+                                  text-gray-700 dark:text-neutral-100
+                                  hover:bg-gray-100 dark:hover:bg-neutral-800">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>Login</span>
+                    </a>
+                }
+            </div>
         </div>
-    </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    @await RenderSectionAsync("Scripts", required: false)
+    </header>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        @RenderBody()
+    </main>
+
+    @RenderSection("Scripts", required: false)
+
+    <script src="~/js/api.js" asp-append-version="true"></script>
+    <script src="~/js/app.js" asp-append-version="true"></script>
 </body>
 </html>

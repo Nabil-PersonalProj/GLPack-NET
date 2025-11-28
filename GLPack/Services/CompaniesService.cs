@@ -1,6 +1,7 @@
 ﻿using GLPack.Contracts;
 using GLPack.DAL;
 using GLPack.Models;
+using GLPack.ViewModels.Home;
 using Microsoft.EntityFrameworkCore;
 
 namespace GLPack.Services
@@ -98,6 +99,24 @@ namespace GLPack.Services
                 sourceFile: nameof(CompaniesService),
                 sourceFunction: nameof(DeleteAsync),
                 ct: ct);
+        }
+
+        public async Task<IReadOnlyList<CompanyQuickPick>> GetQuickPicksAsync(string? search, int take = 24, CancellationToken ct = default)
+        {
+            var q = _db.Companies.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                q = q.Where(c =>
+                    EF.Functions.ILike(c.Name, $"%{s}%"));
+            }
+
+            return await q
+                .OrderBy(c => c.Name)
+                .Take(take)
+                .Select(c => new CompanyQuickPick { Id = c.Id, Name = c.Name })
+                .ToListAsync(ct);
         }
     }
 }
