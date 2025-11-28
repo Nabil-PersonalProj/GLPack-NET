@@ -4,10 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GLPack.Controllers
 {
+
     [ApiController]
     [Route("api/companies")]
     public class CompaniesController : ControllerBase
     {
+
         private readonly ICompaniesService _svc;
         public CompaniesController(ICompaniesService svc) => _svc = svc;
 

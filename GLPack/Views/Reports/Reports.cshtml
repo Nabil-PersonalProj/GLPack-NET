@@ -1,0 +1,240 @@
+﻿@model GLPack.ViewModels.Reports.ReportsIndexViewModel
+
+@{
+    ViewData["Title"] = $"{Model.CompanyName} · Reports";
+}
+
+<section class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Reports</h1>
+            <p class="text-sm text-gray-500 dark:text-neutral-400">
+                @Model.CompanyName · Company ID: @Model.CompanyId
+            </p>
+        </div>
+
+        <a href="/company/@Model.CompanyId/dashboard"
+           class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-700
+                  px-3 py-1.5 text-sm text-gray-700 dark:text-neutral-100
+                  hover:bg-gray-50 dark:hover:bg-neutral-800">
+            <span>← Back to dashboard</span>
+        </a>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-neutral-800">
+        <nav class="-mb-px flex gap-4 text-sm" aria-label="Report tabs">
+            <button type="button"
+                    data-report-tab="pl"
+                    class="report-tab active border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 px-2 pb-2">
+                Profit &amp; Loss
+            </button>
+            <button type="button"
+                    data-report-tab="tb"
+                    class="report-tab border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200 px-2 pb-2">
+                Trial Balance
+            </button>
+        </nav>
+    </div>
+
+    <!-- Panels -->
+    <div class="space-y-6">
+        <!-- PROFIT & LOSS PANEL -->
+        <div data-report-panel="pl"
+                class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4 flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                        Profit &amp; Loss
+                    </h2>
+                    <p class="text-xs text-gray-500 dark:text-neutral-400">
+                        Summary of income and expenses (all periods).
+                    </p>
+                </div>
+                <a href="/company/@Model.CompanyId/reports/profit-loss.csv"
+                    class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium
+                        text-white hover:bg-indigo-500">
+                    Download CSV
+                </a>
+            </div>
+
+            <div class="overflow-x-auto -mx-4 -mb-4">
+                <div class="min-w-full align-middle">
+                    @if (Model.ProfitLossSections.Count == 0)
+                    {
+                        <p class="text-sm text-gray-500 dark:text-neutral-400 px-4 pb-4">
+                            No P&amp;L data yet. Post some transactions first.
+                        </p>
+                    }
+                    else
+                    {
+                        <table class="min-w-full text-xs">
+                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-800">
+                                @foreach (var plSection in Model.ProfitLossSections)
+                                {
+                                    <tr class="bg-gray-50 dark:bg-neutral-900/60">
+                                        <td colspan="3" class="px-4 py-2 font-semibold text-gray-700 dark:text-neutral-100">
+                                            @plSection.Title
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-semibold text-gray-700 dark:text-neutral-100">
+                                            @plSection.Total.ToString("N2")
+                                        </td>
+                                    </tr>
+
+                                    @foreach (var line in plSection.Lines)
+                                    {
+                                        <tr>
+                                            <td class="px-4 py-1 font-mono text-[11px] text-gray-500 dark:text-neutral-400">
+                                                @line.AccountCode
+                                            </td>
+                                            <td class="px-2 py-1 text-gray-700 dark:text-neutral-200">
+                                                @line.AccountName
+                                            </td>
+                                            <td class="px-2 py-1 text-gray-400 dark:text-neutral-500 text-right">
+                                                <!-- spacer -->
+                                            </td>
+                                            <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                                @line.Amount.ToString("N2")
+                                            </td>
+                                        </tr>
+                                    }
+
+                                    <tr class="bg-gray-50 dark:bg-neutral-900/60">
+                                        <td colspan="4" class="px-4 py-2"></td>
+                                    </tr>
+                                }
+
+                                <tr class="bg-indigo-50 dark:bg-indigo-900/30">
+                                    <td colspan="3" class="px-4 py-2 font-semibold text-gray-800 dark:text-neutral-50">
+                                        Net Profit
+                                    </td>
+                                    <td class="px-4 py-2 text-right font-semibold text-gray-800 dark:text-neutral-50">
+                                        @Model.NetProfit.ToString("N2")
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- TRIAL BALANCE PANEL -->
+        <div data-report-panel="tb"
+                class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4 flex flex-col hidden">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                        Trial Balance
+                    </h2>
+                    <p class="text-xs text-gray-500 dark:text-neutral-400">
+                        Debits and credits by account (all periods).
+                    </p>
+                </div>
+                <a href="/company/@Model.CompanyId/reports/trial-balance.csv"
+                    class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium
+                        text-white hover:bg-indigo-500">
+                    Download CSV
+                </a>
+            </div>
+
+            <div class="overflow-x-auto -mx-4 -mb-4">
+                <table class="min-w-full text-xs">
+                    <thead class="border-b border-gray-200 dark:border-neutral-800">
+                        <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                            <th class="px-4 py-2 text-left">Code</th>
+                            <th class="px-2 py-2 text-left">Name</th>
+                            <th class="px-2 py-2 text-left">Type</th>
+                            <th class="px-4 py-2 text-right">Debit</th>
+                            <th class="px-4 py-2 text-right">Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-neutral-800">
+                        @if (Model.TrialBalanceRows.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="5" class="px-4 py-4 text-sm text-gray-500 dark:text-neutral-400">
+                                    No trial balance data yet.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in Model.TrialBalanceRows)
+                            {
+                                <tr>
+                                    <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">
+                                        @row.AccountCode
+                                    </td>
+                                    <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">
+                                        @row.AccountName
+                                    </td>
+                                    <td class="px-2 py-1 text-gray-500 dark:text-neutral-400">
+                                        @row.AccountType
+                                    </td>
+                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                        @row.Debit.ToString("N2")
+                                    </td>
+                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                        @row.Credit.ToString("N2")
+                                    </td>
+                                </tr>
+                            }
+
+                            <tr class="bg-gray-50 dark:bg-neutral-900/60 font-semibold">
+                                <td class="px-4 py-2" colspan="3">Totals</td>
+                                <td class="px-4 py-2 text-right">
+                                    @Model.TrialBalanceTotalDebit.ToString("N2")
+                                </td>
+                                <td class="px-4 py-2 text-right">
+                                    @Model.TrialBalanceTotalCredit.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+@section Scripts {
+    <script>
+        (function () {
+            const tabs = document.querySelectorAll(".report-tab");
+            const panels = document.querySelectorAll("[data-report-panel]");
+
+            function selectTab(key) {
+                tabs.forEach(t => {
+                    const isActive = t.dataset.reportTab === key;
+                    t.classList.toggle("active", isActive);
+                    if (isActive) {
+                        t.classList.add("border-indigo-500", "text-indigo-600", "dark:text-indigo-400");
+                        t.classList.remove("border-transparent", "text-gray-500", "dark:text-neutral-400");
+                    } else {
+                        t.classList.remove("border-indigo-500", "text-indigo-600", "dark:text-indigo-400");
+                        t.classList.add("border-transparent", "text-gray-500", "dark:text-neutral-400");
+                    }
+                });
+
+                panels.forEach(p => {
+                    const show = p.dataset.reportPanel === key;
+                    p.classList.toggle("hidden", !show);
+                });
+            }
+
+            tabs.forEach(t => {
+                t.addEventListener("click", () => {
+                    const key = t.dataset.reportTab;
+                    if (!key) return;
+                    selectTab(key);
+                });
+            });
+
+            // default: Profit & Loss
+            selectTab("pl");
+        })();
+    </script>
+}

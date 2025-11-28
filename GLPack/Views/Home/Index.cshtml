@@ -1,8 +1,161 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@model GLPack.ViewModels.Home.HomeIndexViewModel
+@{
+    ViewData["Title"] = "Companies";
+    ViewData["Breadcrumb"] = "Companies";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="space-y-6">
+
+    <!-- Title + Create Button -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold tracking-tight">Companies</h1>
+
+        <!-- New Company opens modal -->
+        <button id="btnOpenNewCompanyModal"
+                type="button"
+                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium
+                       bg-indigo-600 text-white hover:bg-indigo-500">
+            <i class="fa-solid fa-plus mr-1"></i>
+            New Company
+        </button>
+    </div>
+
+    <!-- Search box -->
+    <div class="max-w-sm">
+        <input type="text"
+               name="Search"
+               value="@Model.Search"
+               class="w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                      px-3 py-2 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               placeholder="Search companies..." />
+    </div>
+
+    <!-- Alert host (used by app.js) -->
+    <div id="alertHost" class="mb-2 space-y-2"></div>
+
+    <!-- Companies list -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"
+         id="companiesGrid"
+         data-behaviour="companies-grid">
+
+        @if (Model.QuickPicks != null && Model.QuickPicks.Any())
+        {
+            foreach (var c in Model.QuickPicks)
+            {
+                <div class="relative group" data-company-card>
+                    <a href="/company/@c.Id/dashboard"
+                       data-company-id="@c.Id"
+                       data-company-name="@c.Name"
+                       class="card p-4 flex flex-col justify-between cursor-pointer
+                          hover:shadow-md transition border border-gray-200
+                          dark:border-neutral-700 dark:hover:border-neutral-600">
+
+                        <div>
+                            <h3 class="font-semibold text-gray-900 dark:text-neutral-100 truncate">
+                                @c.Name
+                            </h3>
+                        </div>
+
+                        <div class="mt-4 flex items-center text-indigo-600 dark:text-indigo-400 text-sm">
+                            <span>Open</span>
+                            <i class="fa-solid fa-arrow-right ml-2"></i>
+                        </div>
+                    </a>
+
+                    <!-- Delete button (top-right of card) -->
+                    <button type="button"
+                            data-action="delete-company"
+                            data-company-id="@c.Id"
+                            data-company-name="@c.Name"
+                            class="absolute top-2 right-2 rounded-full bg-red-500/10 text-red-500
+                               opacity-0 group-hover:opacity-100 transition text-[11px] px-2 py-1">
+                        Delete
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-span-full text-center py-10 text-gray-500 dark:text-neutral-400">
+                No companies found.
+            </div>
+        }
+    </div>
 </div>
+
+<!-- New Company Modal -->
+<div id="newCompanyModal"
+     class="fixed inset-0 z-50 hidden items-center justify-center">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/40" data-role="modal-backdrop"></div>
+
+    <!-- Dialog -->
+    <div class="relative z-10 w-full max-w-md mx-auto">
+        <div class="rounded-2xl border border-gray-200 dark:border-neutral-800
+                    bg-white dark:bg-neutral-900 shadow-xl">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
+                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                    New Company
+                </h2>
+                <button type="button"
+                        id="btnCloseNewCompanyModal"
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-neutral-200 text-sm">
+                    ✕
+                </button>
+            </div>
+
+            <div class="px-4 py-3 space-y-3">
+                <div>
+                    <label for="newCompanyName"
+                           class="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-1">
+                        Name
+                    </label>
+                    <input id="newCompanyName"
+                           type="text"
+                           class="w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                                  bg-white dark:bg-neutral-900 px-3 py-2 text-sm
+                                  focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                           placeholder="Company name" />
+                </div>
+
+                <div>
+                    <label for="newCompanyCode"
+                           class="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-1">
+                        Code (optional)
+                    </label>
+                    <input id="newCompanyCode"
+                           type="text"
+                           class="w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                                  bg-white dark:bg-neutral-900 px-3 py-2 text-sm
+                                  focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                           placeholder="Short code like GLP, ACME..." />
+                </div>
+
+                <div id="newCompanyModalAlert" class="space-y-1 text-xs"></div>
+            </div>
+
+            <div class="px-4 py-3 flex items-center justify-end gap-2 border-t border-gray-200 dark:border-neutral-800">
+                <button type="button"
+                        id="btnCancelNewCompany"
+                        class="inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                               px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                               hover:bg-gray-50 dark:hover:bg-neutral-800">
+                    Cancel
+                </button>
+                <button type="button"
+                        id="btnSaveNewCompany"
+                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-medium
+                               text-white hover:bg-indigo-500">
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.__page__ = { name: "companiesHub" };
+    </script>
+}

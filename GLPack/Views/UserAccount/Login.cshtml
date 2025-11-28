@@ -1,0 +1,43 @@
+﻿@model GLPack.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+    ViewData["Breadcrumb"] = "Login";
+}
+
+<div class="max-w-md mx-auto mt-8 bg-white dark:bg-neutral-900 rounded-xl shadow border border-gray-200 dark:border-neutral-800 p-6">
+    <h1 class="text-xl font-semibold mb-4">Login</h1>
+
+    <form asp-action="Login" method="post" class="space-y-4">
+        <input asp-for="ReturnUrl" type="hidden" />
+
+        <div>
+            <label asp-for="Email" class="block text-sm font-medium mb-1"></label>
+            <input asp-for="Email"
+                   class="block w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                          bg-white dark:bg-neutral-900 px-3 py-2 text-sm" />
+        </div>
+
+        <div>
+            <label asp-for="Password" class="block text-sm font-medium mb-1"></label>
+            <input asp-for="Password"
+                   type="password"
+                   class="block w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                          bg-white dark:bg-neutral-900 px-3 py-2 text-sm" />
+        </div>
+
+        @* Simple error summary placeholder, no tag helpers to complain *@
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="text-sm text-red-600">
+                Invalid login attempt.
+            </div>
+        }
+
+        <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg px-4 py-2
+                       bg-blue-600 text-white text-sm font-medium
+                       hover:bg-blue-700">
+            Log in
+        </button>
+    </form>
+</div>

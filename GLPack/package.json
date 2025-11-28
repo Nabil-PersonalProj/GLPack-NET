@@ -1,0 +1,14 @@
+{
+  "name": "glpack",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tailwindcss -i ./styles/input.css -o ./wwwroot/css/site.css --watch",
+    "build": "tailwindcss -i ./styles/input.css -o ./wwwroot/css/site.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.10",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.41"
+  }
+}
