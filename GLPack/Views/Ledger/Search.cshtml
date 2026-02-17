@@ -1,0 +1,89 @@
+﻿@model GLPack.ViewModels.Companies.DashboardViewModel
+@{
+    ViewData["Title"] = $"{Model.CompanyName} - Global Search";
+}
+
+<div class="min-h-screen bg-zinc-950 text-zinc-100">
+    <div class="max-w-6xl mx-auto px-4 py-6">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight">Global Search</h1>
+                <p class="text-sm text-zinc-400 mt-1">
+                    Company: <span class="font-medium text-zinc-200">@Model.CompanyName</span>
+                </p>
+            </div>
+
+            <a class="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+               href="/company/@Model.CompanyId/dashboard">
+                Back to Dashboard
+            </a>
+        </div>
+
+        <div class="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/60 shadow-sm">
+            <div class="p-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-end">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-zinc-200" for="ledgerSearchInput">Search</label>
+                        <input id="ledgerSearchInput"
+                               type="text"
+                               placeholder="Search accounts, transaction no, memo, description..."
+                               class="mt-2 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600"
+                               autocomplete="off" />
+                        <p class="mt-2 text-xs text-zinc-500">
+                            Tip: arriving here via Accounts/Transactions should auto-filter.
+                        </p>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="btnLedgerSearch"
+                                class="inline-flex items-center rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white">
+                            Search
+                        </button>
+
+                        <button id="btnLedgerClear"
+                                class="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div id="ledgerAlertHost" class="mt-4"></div>
+            </div>
+
+            <div class="border-t border-zinc-800">
+                <div class="overflow-hidden rounded-b-2xl">
+                    <table class="min-w-full">
+                        <thead class="bg-zinc-950">
+                            <tr class="border-b border-zinc-800">
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400">Account</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400">Transaction</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400">Description</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400">Debit</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400">Credit</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="ledgerResultsBody" class="divide-y divide-zinc-800 bg-zinc-900/40">
+                            <tr>
+                                <td class="px-4 py-4 text-sm text-zinc-500" colspan="4">
+                                    Start typing a query, or arrive here via an Account/Transaction link.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.__page__ = {
+            name: "ledgerSearch",
+            companyId: @Model.CompanyId
+        };
+    </script>
+    <script src="~/js/api.js" asp-append-version="true"></script>
+    <script src="~/js/app.js" asp-append-version="true"></script>
+}

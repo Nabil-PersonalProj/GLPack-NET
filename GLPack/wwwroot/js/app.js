@@ -11,6 +11,8 @@
             initAccountsIndex();
         } else if (page === "transactionsIndex") {
             initTransactionsIndex();
+        } else if (page === "ledgerSearch") {
+            initLedgerSearch();
         }
     });
 
@@ -313,7 +315,12 @@
                          ${row._selected ? "checked" : ""} />
                 </td>
                 <td class="px-3 py-2 font-mono text-xs">${escapeHtml(row.accountCode)}</td>
-                <td class="px-3 py-2">${escapeHtml(row.name)}</td>
+                <td class="px-3 py-2">
+                  <a class="text-indigo-600 hover:underline"
+                     href="/company/${companyId}/search?accountCode=${encodeURIComponent(row.accountCode)}">
+                    ${escapeHtml(row.name)}
+                  </a>
+                </td>
                 <td class="px-3 py-2">${escapeHtml(row.type)}</td>
                 <td class="px-3 py-2 text-right space-x-2">
                   <button type="button"
@@ -709,8 +716,12 @@
                 </td>
                 <td class="px-3 py-2 font-mono text-xs">
                   ${row.transactionNo != null
-                                    ? escapeHtml(String(row.transactionNo))
-                                    : "<span class='text-gray-400'>New</span>"}
+                                    ? `<a class="text-indigo-600 hover:underline"
+                          href="/company/${companyId}/search?transactionNo=${encodeURIComponent(String(row.transactionNo))}">
+                         ${escapeHtml(String(row.transactionNo))}
+                       </a>`
+                                    : "<span class='text-gray-400'>New</span>"
+                  }
                 </td>
                 <td class="px-3 py-2 text-xs text-gray-700 dark:text-neutral-200">
                   ${escapeHtml(formatDate(row.txnDate))}
@@ -1250,6 +1261,129 @@
             await loadAll();
         })();
     }  
+
+    // ---------- LedgerSearch ----------
+    function initLedgerSearch() {
+        const info = window.__page__ || {};
+        const companyId = info.companyId;
+        if (!companyId) return;
+
+        const input = document.querySelector('#ledgerSearchInput');
+        const btnSearch = document.querySelector('#btnLedgerSearch');
+        const btnClear = document.querySelector('#btnLedgerClear');
+        const tbody = document.querySelector('#ledgerResultsBody');
+        const alertHost = document.querySelector('#ledgerAlertHost');
+
+        const url = new URL(window.location.href);
+        const q0 = url.searchParams.get("q") || "";
+        const accountCode0 = url.searchParams.get("accountCode") || "";
+        const transactionNo0 = url.searchParams.get("transactionNo");
+        const txNoParsed = transactionNo0 != null && transactionNo0 !== ""
+            ? Number(transactionNo0)
+            : null;
+
+        if (input) input.value = q0;
+
+        async function runSearch({ q, accountCode, transactionNo } = {}) {
+            try {
+                if (alertHost) alertHost.innerHTML = "";
+
+                const results = await API.ledgerSearch(companyId, {
+                    q: q || "",
+                    accountCode: accountCode || "",
+                    transactionNo: transactionNo ?? null,
+                    page: 1,
+                    pageSize: 200
+                });
+
+                renderResults(results || []);
+            } catch (err) {
+                showAlert(alertHost, "danger", "Search failed: " + (err.message || err));
+                renderResults([]);
+            }
+        }
+
+        function renderResults(results) {
+            if (!tbody) return;
+
+            if (!results.length) {
+                tbody.innerHTML = `
+      <tr>
+        <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
+      </tr>`;
+                return;
+            }
+
+            const money = (n) => {
+                const v = Number(n || 0);
+                return v ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+            };
+
+            tbody.innerHTML = results.map(r => {
+                const date = escapeHtml((r.date || r.Date || "").toString().slice(0, 10));
+                const txNo = r.transactionNo ?? r.TransactionNo;
+                const txDesc = escapeHtml(r.transactionDescription ?? r.TransactionDescription ?? "");
+                const accCode = escapeHtml(r.accountCode ?? r.AccountCode ?? "");
+                const accName = escapeHtml(r.accountName ?? r.AccountName ?? "");
+                const line = escapeHtml(r.lineDescription ?? r.LineDescription ?? "");
+                const debit = money(r.debit ?? r.Debit);
+                const credit = money(r.credit ?? r.Credit);
+
+                const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCode)}`;
+                const txHref = `/company/${companyId}/search?transactionNo=${encodeURIComponent(String(txNo))}`;
+
+                return `
+                    <tr class="border-b border-zinc-800 hover:bg-zinc-900/60">
+                    <td class="px-4 py-3 text-sm">
+                        <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                            href="${accHref}">${accCode} — ${accName}</a>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                        <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                            href="${txHref}">${date} • TX #${escapeHtml(String(txNo))}</a>
+                        <div class="text-xs text-zinc-500 mt-1">${txDesc}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-zinc-300">${line}</td>
+                    <td class="px-4 py-3 text-sm text-right font-mono">${escapeHtml(debit)}</td>
+                    <td class="px-4 py-3 text-sm text-right font-mono">${escapeHtml(credit)}</td>
+                    </tr>`;
+                        }).join("");
+        }
+
+        // Button actions
+        if (btnSearch) {
+            btnSearch.addEventListener("click", () => {
+                const q = (input?.value || "").trim();
+                // free text search takes over; clear drilldown params
+                const next = new URL(window.location.href);
+                next.searchParams.delete("accountCode");
+                next.searchParams.delete("transactionNo");
+                if (q) next.searchParams.set("q", q);
+                else next.searchParams.delete("q");
+                window.history.replaceState({}, "", next.toString());
+                runSearch({ q });
+            });
+        }
+
+        if (btnClear) {
+            btnClear.addEventListener("click", () => {
+                if (input) input.value = "";
+                const next = new URL(window.location.href);
+                next.search = "";
+                window.history.replaceState({}, "", next.toString());
+                renderResults([]);
+            });
+        }
+
+        // Auto-run on load (drilldown works immediately)
+        if (txNoParsed != null && !Number.isNaN(txNoParsed)) {
+            runSearch({ transactionNo: txNoParsed });
+        } else if (accountCode0) {
+            runSearch({ accountCode: accountCode0 });
+        } else if (q0) {
+            runSearch({ q: q0 });
+        }
+    }
 
     // ---------- helpers ----------
     function showAlert(host, type, msg) {

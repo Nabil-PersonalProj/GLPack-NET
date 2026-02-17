@@ -144,6 +144,31 @@
         });
     }
 
+    // ----- Accounts API -----
+
+    function ledgerSearch(companyId, opts = {}) {
+        const {
+            q = "",
+            accountCode = "",
+            transactionNo = null,
+            from = null,
+            to = null,
+            page = 1,
+            pageSize = 100
+        } = opts;
+
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (accountCode) params.set("accountCode", accountCode);
+        if (transactionNo != null) params.set("transactionNo", String(transactionNo));
+        if (from) params.set("from", from);
+        if (to) params.set("to", to);
+        params.set("page", String(page));
+        params.set("pageSize", String(pageSize));
+
+        return request(`/api/companies/${companyId}/search?` + params.toString());
+    }
+
     global.API = {
         getCompanies,
         createCompany,
@@ -157,5 +182,6 @@
         createTransaction,
         updateTransaction,
         deleteTransaction,
+        ledgerSearch,
     };
 })(window);

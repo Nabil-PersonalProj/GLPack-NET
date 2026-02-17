@@ -75,5 +75,19 @@ namespace GLPack.Controllers
             return View("~/Views/Transactions/Transactions.cshtml", vm);
         }
 
+        [HttpGet("{id:int}/search")]
+        public async Task<IActionResult> Search(int id, CancellationToken ct)
+        {
+            var company = await _db.Companies
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (company == null) return NotFound();
+            var vm = new DashboardViewModel
+            {
+                CompanyId = company.Id,
+                CompanyName = company.Name
+            };
+            return View("~/Views/Ledger/Search.cshtml", vm);
+        }
     }
 }

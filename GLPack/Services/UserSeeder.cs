@@ -7,40 +7,46 @@ namespace GLPack.Services
 {
     public static class UserSeeder
     {
-        public static async Task SeedNabilAsync(ApplicationDbContext db)
+        public static async Task SeedDefaultUsersAsync(ApplicationDbContext db)
         {
-            await db.Database.MigrateAsync();
-
-            const string email = "muhammad.nabilhakeem@gmail.com";
-            const string password = "super";
-
-            var existing = await db.AppUsers
-                .SingleOrDefaultAsync(u => u.Email == email);
-
             var hasher = new PasswordHasher<AppUser>();
 
-            if (existing == null)
+            await EnsureUserAsync(db, hasher,
+                email: "muhammadnabil.hakeem@gmail.com",
+                password: "super",
+                isAdmin: true,
+                isActive: true);
+
+            await EnsureUserAsync(db, hasher,
+                email: "davidchew12345@gmail.com",
+                password: "1234",
+                isAdmin: false,
+                isActive: true);
+        }
+
+        private static async Task EnsureUserAsync(
+            ApplicationDbContext db,
+            PasswordHasher<AppUser> hasher,
+            string email,
+            string password,
+            bool isAdmin,
+            bool isActive)
+        {
+            var existing = await db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
+            if (existing != null) return;
+
+            var user = new AppUser
             {
-                var admin = new AppUser
-                {
-                    Email = email,
-                    IsAdmin = true,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    IsActive = true
-                };
+                Email = email,
+                IsAdmin = isAdmin,
+                IsActive = isActive,
+                CreatedAtUtc = DateTime.UtcNow,
+                LastLoginAtUtc = null
+            };
 
-                admin.PasswordHash = hasher.HashPassword(admin, password);
+            user.PasswordHash = hasher.HashPassword(user, password);
 
-                db.AppUsers.Add(admin);
-            }
-            else if (string.IsNullOrEmpty(existing.PasswordHash))
-            {
-                // row exists but no password yet → fix it
-                existing.IsAdmin = true;
-                existing.IsActive = true;
-                existing.PasswordHash = hasher.HashPassword(existing, password);
-            }
-
+            db.AppUsers.Add(user);
             await db.SaveChangesAsync();
         }
     }
