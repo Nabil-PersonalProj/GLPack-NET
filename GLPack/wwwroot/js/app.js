@@ -772,12 +772,12 @@
                 if (btnCancel) btnCancel.disabled = true;
                 if (linesBody) {
                     linesBody.innerHTML = `
-          <tr>
-            <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-              No transaction selected.
-            </td>
-          </tr>
-        `;
+                      <tr>
+                        <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                          No transaction selected.
+                        </td>
+                      </tr>
+                    `;
                 }
                 if (totalDrEl) totalDrEl.textContent = "0.00";
                 if (totalCrEl) totalCrEl.textContent = "0.00";

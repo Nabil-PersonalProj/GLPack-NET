@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Text;
 using GLPack.DAL;
+using GLPack.ViewModels.Reports;
 using Microsoft.EntityFrameworkCore;
 
 namespace GLPack.Services
@@ -14,17 +15,19 @@ namespace GLPack.Services
             _db = db;
         }
 
-        // ---------- TRIAL BALANCE ----------
+        // ----------------------------
+        // DATA BUILDERS (shared)
+        // ----------------------------
 
-        public async Task<string> GetTrialBalanceCsvAsync(int companyId, CancellationToken ct)
+        public async Task<(List<TrialBalanceRow> Rows, decimal TotalDebit, decimal TotalCredit)>
+            GetTrialBalanceAsync(int companyId, CancellationToken ct)
         {
-            // Sum debits / credits per account
             var rows = await _db.TransactionEntries
                 .Where(e => e.CompanyId == companyId)
                 .GroupBy(e => new { e.AccountCode, e.Account.Name, e.Account.Type })
-                .Select(g => new
+                .Select(g => new TrialBalanceRow
                 {
-                    g.Key.AccountCode,
+                    AccountCode = g.Key.AccountCode,
                     AccountName = g.Key.Name,
                     AccountType = g.Key.Type,
                     Debit = g.Sum(x => x.Debit),
@@ -32,6 +35,126 @@ namespace GLPack.Services
                 })
                 .OrderBy(r => r.AccountCode)
                 .ToListAsync(ct);
+
+            var totalDebit = rows.Sum(r => r.Debit);
+            var totalCredit = rows.Sum(r => r.Credit);
+
+            return (rows, totalDebit, totalCredit);
+        }
+
+        public async Task<(List<ProfitLossSection> Sections, decimal NetProfit)>
+            GetProfitAndLossAsync(int companyId, CancellationToken ct)
+        {
+            var entries = await _db.TransactionEntries
+                .Where(e => e.CompanyId == companyId)
+                .Select(e => new
+                {
+                    e.AccountCode,
+                    AccountName = e.Account.Name,
+                    AccountType = e.Account.Type,
+                    e.Debit,
+                    e.Credit
+                })
+                .ToListAsync(ct);
+
+            var grouped = entries
+                .GroupBy(e => new { e.AccountCode, e.AccountName, e.AccountType })
+                .Select(g => new
+                {
+                    g.Key.AccountCode,
+                    g.Key.AccountName,
+                    g.Key.AccountType,
+                    TotalDebit = g.Sum(x => x.Debit),
+                    TotalCredit = g.Sum(x => x.Credit)
+                })
+                .ToList();
+
+            var sales = new ProfitLossSection { Title = "Sales" };
+            var costOfSales = new ProfitLossSection { Title = "Cost of Sales" };
+            var expenses = new ProfitLossSection { Title = "Expenses" };
+            var plBf = new ProfitLossSection { Title = "P&L B/F" };
+
+            foreach (var a in grouped)
+            {
+                // base balance: debit - credit (debit-normal)
+                var balance = a.TotalDebit - a.TotalCredit;
+
+                switch (a.AccountType)
+                {
+                    case "Sales":
+                        // credits positive
+                        var salesAmt = -balance;
+                        if (salesAmt != 0)
+                        {
+                            sales.Lines.Add(new ProfitLossLine
+                            {
+                                AccountCode = a.AccountCode,
+                                AccountName = a.AccountName,
+                                Amount = salesAmt
+                            });
+                            sales.Total += salesAmt;
+                        }
+                        break;
+
+                    case "Cost of Sale":
+                        if (balance != 0)
+                        {
+                            costOfSales.Lines.Add(new ProfitLossLine
+                            {
+                                AccountCode = a.AccountCode,
+                                AccountName = a.AccountName,
+                                Amount = balance
+                            });
+                            costOfSales.Total += balance;
+                        }
+                        break;
+
+                    case "Expense":
+                        if (balance != 0)
+                        {
+                            expenses.Lines.Add(new ProfitLossLine
+                            {
+                                AccountCode = a.AccountCode,
+                                AccountName = a.AccountName,
+                                Amount = balance
+                            });
+                            expenses.Total += balance;
+                        }
+                        break;
+
+                    case "P&L":
+                        if (balance != 0)
+                        {
+                            plBf.Lines.Add(new ProfitLossLine
+                            {
+                                AccountCode = a.AccountCode,
+                                AccountName = a.AccountName,
+                                Amount = balance
+                            });
+                            plBf.Total += balance;
+                        }
+                        break;
+                }
+            }
+
+            var sections = new List<ProfitLossSection>();
+            if (sales.Lines.Count > 0 || sales.Total != 0) sections.Add(sales);
+            if (costOfSales.Lines.Count > 0 || costOfSales.Total != 0) sections.Add(costOfSales);
+            if (expenses.Lines.Count > 0 || expenses.Total != 0) sections.Add(expenses);
+            if (plBf.Lines.Count > 0 || plBf.Total != 0) sections.Add(plBf);
+
+            var netProfit = sales.Total - costOfSales.Total - expenses.Total + plBf.Total;
+
+            return (sections, netProfit);
+        }
+
+        // ----------------------------
+        // CSV EXPORTS (reuse builders)
+        // ----------------------------
+
+        public async Task<string> GetTrialBalanceCsvAsync(int companyId, CancellationToken ct)
+        {
+            var (rows, totalDebit, totalCredit) = await GetTrialBalanceAsync(companyId, ct);
 
             var sb = new StringBuilder();
             var csv = new CsvWriter(sb);
@@ -49,9 +172,6 @@ namespace GLPack.Services
                 );
             }
 
-            // Simple control total
-            var totalDebit = rows.Sum(r => r.Debit);
-            var totalCredit = rows.Sum(r => r.Credit);
             csv.WriteRow();
             csv.WriteRow("TOTAL", "", "",
                 totalDebit.ToString("0.00", CultureInfo.InvariantCulture),
@@ -60,110 +180,32 @@ namespace GLPack.Services
             return sb.ToString();
         }
 
-        // ---------- PROFIT & LOSS ----------
-
         public async Task<string> GetProfitAndLossCsvAsync(int companyId, CancellationToken ct)
         {
-            var entries = await _db.TransactionEntries
-                .Where(e => e.CompanyId == companyId)
-                .Select(e => new
-                {
-                    e.AccountCode,
-                    e.Account.Name,
-                    e.Account.Type,
-                    e.Debit,
-                    e.Credit
-                })
-                .ToListAsync(ct);
-
-            var grouped = entries
-                .GroupBy(e => new { e.AccountCode, e.Name, e.Type })
-                .Select(g => new
-                {
-                    g.Key.AccountCode,
-                    AccountName = g.Key.Name,
-                    AccountType = g.Key.Type,
-                    TotalDebit = g.Sum(x => x.Debit),
-                    TotalCredit = g.Sum(x => x.Credit)
-                })
-                .ToList();
-
-            // Categorise
-            var sales = new List<dynamic>();
-            var costOfSales = new List<dynamic>();
-            var expenses = new List<dynamic>();
-            var profitLossBf = new List<dynamic>();
-
-            decimal totalSales = 0, totalCostOfSales = 0, totalExpenses = 0, totalPLBf = 0;
-
-            foreach (var a in grouped)
-            {
-                // base balance: debit - credit (debit-normal)
-                var balance = a.TotalDebit - a.TotalCredit;
-
-                switch (a.AccountType)
-                {
-                    case "Sales":
-                        var salesAmt = -balance; // credits positive
-                        if (salesAmt != 0)
-                        {
-                            sales.Add(new { a.AccountCode, a.AccountName, Amount = salesAmt });
-                            totalSales += salesAmt;
-                        }
-                        break;
-
-                    case "Cost of Sale":
-                        if (balance != 0)
-                        {
-                            costOfSales.Add(new { a.AccountCode, a.AccountName, Amount = balance });
-                            totalCostOfSales += balance;
-                        }
-                        break;
-
-                    case "Expense":
-                        if (balance != 0)
-                        {
-                            expenses.Add(new { a.AccountCode, a.AccountName, Amount = balance });
-                            totalExpenses += balance;
-                        }
-                        break;
-
-                    case "Profit & Loss":
-                        if (balance != 0)
-                        {
-                            profitLossBf.Add(new { a.AccountCode, a.AccountName, Amount = balance });
-                            totalPLBf += balance;
-                        }
-                        break;
-                }
-            }
-
-            var netProfit = totalSales - totalCostOfSales - totalExpenses + totalPLBf;
+            var (sections, netProfit) = await GetProfitAndLossAsync(companyId, ct);
 
             var sb = new StringBuilder();
             var csv = new CsvWriter(sb);
 
             csv.WriteRow("Category", "Account Code", "Account Name", "Amount");
 
-            void writeSection(string title, IEnumerable<dynamic> items, decimal total)
+            foreach (var section in sections)
             {
-                csv.WriteRow(title);
-                foreach (var i in items)
+                csv.WriteRow(section.Title);
+
+                foreach (var line in section.Lines)
                 {
                     csv.WriteRow("",
-                        i.AccountCode,
-                        i.AccountName,
-                        ((decimal)i.Amount).ToString("0.00", CultureInfo.InvariantCulture));
+                        line.AccountCode,
+                        line.AccountName,
+                        line.Amount.ToString("0.00", CultureInfo.InvariantCulture));
                 }
-                csv.WriteRow("", "", "Total " + title,
-                    total.ToString("0.00", CultureInfo.InvariantCulture));
+
+                csv.WriteRow("", "", "Total " + section.Title,
+                    section.Total.ToString("0.00", CultureInfo.InvariantCulture));
+
                 csv.WriteRow();
             }
-
-            writeSection("Sales", sales, totalSales);
-            writeSection("Cost of Sales", costOfSales, totalCostOfSales);
-            writeSection("Expenses", expenses, totalExpenses);
-            writeSection("Profit & Loss B/F", profitLossBf, totalPLBf);
 
             csv.WriteRow("Net Profit", "", "",
                 netProfit.ToString("0.00", CultureInfo.InvariantCulture));
@@ -171,7 +213,9 @@ namespace GLPack.Services
             return sb.ToString();
         }
 
-        // ---------- tiny CSV helper ----------
+        // ----------------------------
+        // tiny CSV helper
+        // ----------------------------
 
         private sealed class CsvWriter
         {

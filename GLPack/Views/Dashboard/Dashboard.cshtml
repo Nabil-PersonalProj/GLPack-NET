@@ -71,6 +71,89 @@
             </p>
         </div>
     </div>
+
+    <!-- Trial Balance (Homepage) -->
+    <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4 lg:col-span-2">
+        <div class="flex items-center justify-between mb-2">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                    Trial Balance
+                </h2>
+                <p class="text-xs text-gray-500 dark:text-neutral-400">
+                    Debits and credits by account (all periods).
+                </p>
+            </div>
+
+            <a href="/company/@Model.CompanyId/reports"
+               class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                Open full reports
+            </a>
+        </div>
+
+        <div class="overflow-x-auto -mx-4 -mb-4">
+            <table class="min-w-full text-xs">
+                <thead class="border-b border-gray-200 dark:border-neutral-800">
+                    <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                        <th class="px-4 py-2 text-left">Code</th>
+                        <th class="px-2 py-2 text-left">Name</th>
+                        <th class="px-2 py-2 text-left">Type</th>
+                        <th class="px-4 py-2 text-right">Debit</th>
+                        <th class="px-4 py-2 text-right">Credit</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-gray-100 dark:divide-neutral-800">
+                    @if (Model.TrialBalanceRows.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="px-4 py-4 text-sm text-gray-500 dark:text-neutral-400">
+                                No trial balance data yet.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var row in Model.TrialBalanceRows)
+                        {
+                            <tr>
+                                <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">
+                                    <a class="hover:underline text-indigo-600 dark:text-indigo-400"
+                                       href="/company/@Model.CompanyId/search?accountCode=@row.AccountCode">
+                                        @row.AccountCode
+                                    </a>
+                                </td>
+
+                                <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">
+                                    <a class="hover:underline text-indigo-600 dark:text-indigo-400"
+                                       href="/company/@Model.CompanyId/search?accountCode=@row.AccountCode">
+                                        @row.AccountName
+                                    </a>
+                                </td>
+
+                                <td class="px-2 py-1 text-gray-500 dark:text-neutral-400">
+                                    @row.AccountType
+                                </td>
+
+                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                    @row.Debit.ToString("N2")
+                                </td>
+
+                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                    @row.Credit.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+
+                        <tr class="bg-gray-50 dark:bg-neutral-900/60 font-semibold">
+                            <td class="px-4 py-2" colspan="3">Totals</td>
+                            <td class="px-4 py-2 text-right">@Model.TrialBalanceTotalDebit.ToString("N2")</td>
+                            <td class="px-4 py-2 text-right">@Model.TrialBalanceTotalCredit.ToString("N2")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 </section>
 
 @section Scripts {

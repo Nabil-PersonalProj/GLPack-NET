@@ -1,4 +1,5 @@
 ﻿using GLPack.DAL;
+using GLPack.Services;
 using GLPack.ViewModels.Companies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,10 +11,12 @@ namespace GLPack.Controllers
     public class CompanyPagesController : Controller
     {
         private readonly ApplicationDbContext _db;
+        private readonly IReportsService _reports;
 
-        public CompanyPagesController(ApplicationDbContext db)
+        public CompanyPagesController(ApplicationDbContext db, IReportsService reports)
         {
             _db = db;
+            _reports = reports;
         }
 
         // GET /company/{id}/dashboard
@@ -29,10 +32,15 @@ namespace GLPack.Controllers
                 return NotFound();
             }
 
+            var (tbRows, tbDr, tbCr) = await _reports.GetTrialBalanceAsync(company.Id, ct);
+
             var vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
-                CompanyName = company.Name
+                CompanyName = company.Name,
+                TrialBalanceRows = tbRows,
+                TrialBalanceTotalDebit = tbDr,
+                TrialBalanceTotalCredit = tbCr
             };
 
             // Explicit path so we use Views/Dashboard/Dashboard.cshtml
