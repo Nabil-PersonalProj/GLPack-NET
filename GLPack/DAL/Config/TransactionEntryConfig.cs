@@ -39,7 +39,7 @@ namespace GLPack.DAL.Config
             {
                 t.HasCheckConstraint("ck_entry_nonneg", "(debit >= 0 AND credit >= 0)");
                 t.HasCheckConstraint("ck_entry_one_side",
-                    "((debit = 0 AND credit > 0) OR (credit = 0 AND debit > 0))");
+                    "((debit = 0 AND credit >= 0) OR (credit = 0 AND debit >= 0))");
             });
         }
     }

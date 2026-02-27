@@ -26,7 +26,7 @@ namespace GLPack.Services
 
             foreach (var entry in dto.Entries)
             {
-                if (entry.Amount <= 0)
+                if (entry.Amount < 0)
                     throw new ArgumentException("Entry amounts must be positive.");
                 if (entry.DrCr != "DR" && entry.DrCr != "CR")
                     throw new ArgumentException("Entry DrCr must be 'DR' or 'CR'.");
@@ -210,7 +210,7 @@ namespace GLPack.Services
 
             foreach (var e in dto.Entries)
             {
-                if (e.Amount <= 0m) throw new InvalidOperationException("All amounts must be positive.");
+                if (e.Amount < 0m) throw new InvalidOperationException("All amounts must be positive.");
                 var side = e.DrCr?.Trim().ToUpperInvariant();
                 if (side is not ("DR" or "CR"))
                     throw new InvalidOperationException("DrCr must be 'DR' or 'CR'.");
