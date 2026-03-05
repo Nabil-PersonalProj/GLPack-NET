@@ -1,4 +1,5 @@
-﻿using GLPack.DAL;
+﻿using AspNetCoreGeneratedDocument;
+using GLPack.DAL;
 using GLPack.Services;
 using GLPack.ViewModels.Companies;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +13,13 @@ namespace GLPack.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly IReportsService _reports;
+        private readonly ITransactionImportService _import;
 
-        public CompanyPagesController(ApplicationDbContext db, IReportsService reports)
+        public CompanyPagesController(ApplicationDbContext db, IReportsService reports, ITransactionImportService import)
         {
             _db = db;
             _reports = reports;
+            _import = import;
         }
 
         // GET /company/{id}/dashboard
@@ -96,6 +99,22 @@ namespace GLPack.Controllers
                 CompanyName = company.Name
             };
             return View("~/Views/Ledger/Search.cshtml", vm);
+        }
+
+        [HttpPost("{id:int}/import")]
+        public async Task<IActionResult> ImportCsv(int id, IFormFile csvFile, CancellationToken ct)
+        {
+            try
+            {
+                var count = await _import.ImportCsvAsync(id, csvFile, ct);
+                TempData["ImportSuccess"] = $"Imported {count} lines.";
+            }
+            catch (Exception ex)
+            {
+                TempData["ImportError"] = ex.Message;
+            }
+
+            return Redirect($"/company/{id}/dashboard");
         }
     }
 }

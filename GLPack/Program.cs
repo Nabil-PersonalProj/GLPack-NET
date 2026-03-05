@@ -26,6 +26,7 @@ builder.Services.AddScoped<ICompaniesService, CompaniesService>();
 builder.Services.AddScoped<IAppLogger, AppLogger>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<ILedgerSearchService, LedgerSearchService>();
+builder.Services.AddScoped<ITransactionImportService, TransactionImportService>();
 
 // Cookie auth
 builder.Services
