@@ -8,9 +8,7 @@
         public List<TrialBalanceRow> TrialBalanceRows { get; set; } = new();
         public decimal TrialBalanceTotalDebit { get; set; }
         public decimal TrialBalanceTotalCredit { get; set; }
-
-        public List<ProfitLossSection> ProfitLossSections { get; set; } = new();
-        public decimal NetProfit { get; set; }
+        public List<ProfitLossRowVm> ProfitLossRows { get; set; } = new();
     }
 
     public sealed class TrialBalanceRow
@@ -34,5 +32,13 @@
         public string AccountCode { get; set; } = string.Empty;
         public string AccountName { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+    }
+
+    public sealed class ProfitLossRowVm
+    {
+        public string RowType { get; set; } = string.Empty; // Header, Account, Subtotal, Calculated, Spacer
+        public string? Code { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public decimal? Amount { get; set; }
     }
 }

@@ -42,7 +42,7 @@ namespace GLPack.Services
             return (rows, totalDebit, totalCredit);
         }
 
-        public async Task<(List<ProfitLossSection> Sections, decimal NetProfit)>
+        public async Task<List<ProfitLossRowVm>>
             GetProfitAndLossAsync(int companyId, CancellationToken ct)
         {
             var entries = await _db.TransactionEntries
@@ -69,83 +69,119 @@ namespace GLPack.Services
                 })
                 .ToList();
 
-            var sales = new ProfitLossSection { Title = "Sales" };
-            var costOfSales = new ProfitLossSection { Title = "Cost of Sales" };
-            var expenses = new ProfitLossSection { Title = "Expenses" };
-            var plBf = new ProfitLossSection { Title = "P&L B/F" };
+            var rows = new List<ProfitLossRowVm>();
+            decimal salesTotal = 0m;
+            decimal costOfSalesTotal = 0m;
+            decimal expensesTotal = 0m;
+            decimal balanceBroughtDown = 0m;
+
+            var salesLines = new List<ProfitLossRowVm>();
+            var costLines = new List<ProfitLossRowVm>();
+            var expenseLines = new List<ProfitLossRowVm>();
+            var plLines = new List<ProfitLossRowVm>();
 
             foreach (var a in grouped)
             {
-                // base balance: debit - credit (debit-normal)
-                var balance = a.TotalDebit - a.TotalCredit;
+                var debit = a.TotalDebit;
+                var credit = a.TotalCredit;
+                var accountType = (a.AccountType ?? "").Trim();
+                var accountCode = (a.AccountCode ?? "").Trim();
 
-                switch (a.AccountType)
+                if (accountType.Equals("Sales", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "Sales":
-                        // credits positive
-                        var salesAmt = -balance;
-                        if (salesAmt != 0)
+                    var amount = credit - debit;
+                    if (amount != 0)
+                    {
+                        salesLines.Add(new ProfitLossRowVm
                         {
-                            sales.Lines.Add(new ProfitLossLine
-                            {
-                                AccountCode = a.AccountCode,
-                                AccountName = a.AccountName,
-                                Amount = salesAmt
-                            });
-                            sales.Total += salesAmt;
-                        }
-                        break;
-
-                    case "Cost of Sale":
-                        if (balance != 0)
+                            RowType = "Account",
+                            Code = accountCode,
+                            Description = a.AccountName,
+                            Amount = amount
+                        });
+                        salesTotal += amount;
+                    }
+                }
+                else if (
+                    accountType.Equals("Cost of Sale", StringComparison.OrdinalIgnoreCase) ||
+                    accountType.Equals("Cost of Sales", StringComparison.OrdinalIgnoreCase))
+                {
+                    var amount = debit - credit;
+                    if (amount != 0)
+                    {
+                        costLines.Add(new ProfitLossRowVm
                         {
-                            costOfSales.Lines.Add(new ProfitLossLine
-                            {
-                                AccountCode = a.AccountCode,
-                                AccountName = a.AccountName,
-                                Amount = balance
-                            });
-                            costOfSales.Total += balance;
-                        }
-                        break;
-
-                    case "Expense":
-                        if (balance != 0)
+                            RowType = "Account",
+                            Code = accountCode,
+                            Description = a.AccountName,
+                            Amount = amount
+                        });
+                        costOfSalesTotal += amount;
+                    }
+                }
+                else if (
+                    accountType.Equals("Expense", StringComparison.OrdinalIgnoreCase) ||
+                    accountType.Equals("Expenses", StringComparison.OrdinalIgnoreCase))
+                {
+                    var amount = debit - credit;
+                    if (amount != 0)
+                    {
+                        expenseLines.Add(new ProfitLossRowVm
                         {
-                            expenses.Lines.Add(new ProfitLossLine
-                            {
-                                AccountCode = a.AccountCode,
-                                AccountName = a.AccountName,
-                                Amount = balance
-                            });
-                            expenses.Total += balance;
-                        }
-                        break;
-
-                    case "P&L":
-                        if (balance != 0)
+                            RowType = "Account",
+                            Code = accountCode,
+                            Description = a.AccountName,
+                            Amount = amount
+                        });
+                        expensesTotal += amount;
+                    }
+                }
+                else if (accountType.Equals("Profit & Loss", StringComparison.OrdinalIgnoreCase))
+                {
+                    var amount = credit - debit;
+                    if (amount != 0)
+                    {
+                        plLines.Add(new ProfitLossRowVm
                         {
-                            plBf.Lines.Add(new ProfitLossLine
-                            {
-                                AccountCode = a.AccountCode,
-                                AccountName = a.AccountName,
-                                Amount = balance
-                            });
-                            plBf.Total += balance;
-                        }
-                        break;
+                            RowType = "Account",
+                            Code = accountCode,
+                            Description = a.AccountName,
+                            Amount = amount
+                        });
+                        balanceBroughtDown += amount;
+                    }
                 }
             }
 
             var sections = new List<ProfitLossSection>();
-            if (sales.Lines.Count > 0 || sales.Total != 0) sections.Add(sales);
-            if (costOfSales.Lines.Count > 0 || costOfSales.Total != 0) sections.Add(costOfSales);
-            if (expenses.Lines.Count > 0 || expenses.Total != 0) sections.Add(expenses);
-            if (plBf.Lines.Count > 0 || plBf.Total != 0) sections.Add(plBf);
 
-            var netProfit = sales.Total - costOfSales.Total - expenses.Total + plBf.Total;
+            var grossProfit = salesTotal - costOfSalesTotal;
+            var finalProfit = grossProfit - expensesTotal;
+            var carriedForward = finalProfit + balanceBroughtDown;
 
-            return (sections, netProfit);
+            rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Sales" });
+            rows.AddRange(salesLines);
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Sales", Amount = salesTotal });
+            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+
+            rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Cost of Sales" });
+            rows.AddRange(costLines);
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Cost of Sales", Amount = costOfSalesTotal });
+            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "Gross Profit", Amount = grossProfit });
+            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+
+            rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Expenses" });
+            rows.AddRange(expenseLines);
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Expenses", Amount = expensesTotal });
+            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "Final Profit", Amount = finalProfit });
+            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+
+            rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Balance Brought Down" });
+            rows.AddRange(plLines);
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Balance Brought Down", Amount = balanceBroughtDown });
+            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "P&L Carried Forward", Amount = carriedForward });
+
+            return rows;
         }
 
         // ----------------------------
@@ -182,33 +218,32 @@ namespace GLPack.Services
 
         public async Task<string> GetProfitAndLossCsvAsync(int companyId, CancellationToken ct)
         {
-            var (sections, netProfit) = await GetProfitAndLossAsync(companyId, ct);
+            var rows = await GetProfitAndLossAsync(companyId, ct);
 
             var sb = new StringBuilder();
             var csv = new CsvWriter(sb);
 
-            csv.WriteRow("Category", "Account Code", "Account Name", "Amount");
+            csv.WriteRow("Code", "Description", "Amount");
 
-            foreach (var section in sections)
+            foreach (var row in rows)
             {
-                csv.WriteRow(section.Title);
-
-                foreach (var line in section.Lines)
+                if (row.RowType == "Spacer")
                 {
-                    csv.WriteRow("",
-                        line.AccountCode,
-                        line.AccountName,
-                        line.Amount.ToString("0.00", CultureInfo.InvariantCulture));
+                    csv.WriteRow();
                 }
-
-                csv.WriteRow("", "", "Total " + section.Title,
-                    section.Total.ToString("0.00", CultureInfo.InvariantCulture));
-
-                csv.WriteRow();
+                else if (row.RowType == "Header")
+                {
+                    csv.WriteRow("", row.Description, "");
+                }
+                else
+                {
+                    csv.WriteRow(
+                        row.Code ?? "",
+                        row.Description,
+                        row.Amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? ""
+                    );
+                }
             }
-
-            csv.WriteRow("Net Profit", "", "",
-                netProfit.ToString("0.00", CultureInfo.InvariantCulture));
 
             return sb.ToString();
         }

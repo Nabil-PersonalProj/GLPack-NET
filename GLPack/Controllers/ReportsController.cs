@@ -29,7 +29,7 @@ namespace GLPack.Controllers
             if (company == null) return NotFound();
 
             var (tbRows, tbDr, tbCr) = await _reports.GetTrialBalanceAsync(companyId, ct);
-            var (plSections, netProfit) = await _reports.GetProfitAndLossAsync(companyId, ct);
+            var plRows = await _reports.GetProfitAndLossAsync(companyId, ct);
 
             var vm = new ReportsIndexViewModel
             {
@@ -38,8 +38,7 @@ namespace GLPack.Controllers
                 TrialBalanceRows = tbRows,
                 TrialBalanceTotalDebit = tbDr,
                 TrialBalanceTotalCredit = tbCr,
-                ProfitLossSections = plSections,
-                NetProfit = netProfit
+                ProfitLossRows = plRows,
             };
 
             return View("Reports", vm);

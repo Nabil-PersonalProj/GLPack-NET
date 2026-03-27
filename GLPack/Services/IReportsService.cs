@@ -12,7 +12,6 @@ namespace GLPack.Services
         Task<(List<TrialBalanceRow> Rows, decimal TotalDebit, decimal TotalCredit)>
             GetTrialBalanceAsync(int companyId, CancellationToken ct);
 
-        Task<(List<ProfitLossSection> Sections, decimal NetProfit)>
-            GetProfitAndLossAsync(int companyId, CancellationToken ct);
+        Task<List<ProfitLossRowVm>> GetProfitAndLossAsync(int companyId, CancellationToken ct);
     }
 }
