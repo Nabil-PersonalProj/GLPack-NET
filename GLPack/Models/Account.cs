@@ -11,4 +11,9 @@
         public Company Company { get; set; } = null!;
         public ICollection<TransactionEntry> Entries { get; set; } = new List<TransactionEntry>();
     }
+    public class AccountTypePrefix
+    {
+        public string Prefix { get; set; } = "";
+        public string AccountType { get; set; } = "";
+    }
 }
