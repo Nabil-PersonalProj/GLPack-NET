@@ -223,7 +223,7 @@ namespace GLPack.Services
             var sb = new StringBuilder();
             var csv = new CsvWriter(sb);
 
-            csv.WriteRow("Code", "Description", "Amount");
+            csv.WriteRow("Code", "Description", "Amount", "Total");
 
             foreach (var row in rows)
             {

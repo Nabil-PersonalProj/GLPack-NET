@@ -26,14 +26,15 @@ namespace GLPack.Services
 
             foreach (var entry in dto.Entries)
             {
-                if (entry.Amount < 0)
-                    throw new ArgumentException("Entry amounts must be positive.");
-                if (entry.DrCr != "DR" && entry.DrCr != "CR")
-                    throw new ArgumentException("Entry DrCr must be 'DR' or 'CR'.");
+                if (entry.Debit < 0m || entry.Credit < 0m)
+                    throw new ArgumentException("Entry debit and credit must be zero or positive.");
+
+                if (entry.Debit == 0m && entry.Credit == 0m)
+                    throw new ArgumentException("Each entry must have either a debit, a credit, or both.");
             }
 
-            var totalDr = dto.Entries.Where(e => e.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase)).Sum(e => e.Amount);
-            var totalCr = dto.Entries.Where(e => e.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase)).Sum(e => e.Amount);
+            var totalDr = dto.Entries.Sum(e => e.Debit);
+            var totalCr = dto.Entries.Sum(e => e.Credit);
 
             if (Math.Round(totalDr - totalCr, 2) != 0m)
             {
@@ -90,8 +91,8 @@ namespace GLPack.Services
                 TransactionNo = dto.TransactionNo,
                 AccountCode = e.AccountCode,
                 LineDescription = e.Memo,
-                Debit = e.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m,
-                Credit = e.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m
+                Debit = e.Debit,
+                Credit = e.Credit
             }).ToList();
 
             _db.TransactionEntries.AddRange(lines);
@@ -118,8 +119,8 @@ namespace GLPack.Services
                 Entries = lines.Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 }).ToList()
             };
@@ -137,8 +138,8 @@ namespace GLPack.Services
                 .Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 })
                 .ToListAsync(ct);
@@ -180,8 +181,8 @@ namespace GLPack.Services
                 g => g.Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 }).ToList());
 
@@ -210,13 +211,14 @@ namespace GLPack.Services
 
             foreach (var e in dto.Entries)
             {
-                if (e.Amount < 0m) throw new InvalidOperationException("All amounts must be positive.");
-                var side = e.DrCr?.Trim().ToUpperInvariant();
-                if (side is not ("DR" or "CR"))
-                    throw new InvalidOperationException("DrCr must be 'DR' or 'CR'.");
+                if (e.Debit < 0m || e.Credit < 0m)
+                    throw new InvalidOperationException("All debit and credit amounts must be zero or positive.");
+
+                if (e.Debit == 0m && e.Credit == 0m)
+                    throw new InvalidOperationException("Each entry must have either a debit, a credit, or both.");
             }
-            var totalDr = dto.Entries.Where(x => x.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
-            var totalCr = dto.Entries.Where(x => x.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
+            var totalDr = dto.Entries.Sum(x => x.Debit);
+            var totalCr = dto.Entries.Sum(x => x.Credit);
             if (Math.Round(totalDr - totalCr, 2) != 0m)
             {
                 await _appLogger.LogAsync(
@@ -265,17 +267,17 @@ namespace GLPack.Services
             _db.TransactionEntries.RemoveRange(existingLines);
             await _db.SaveChangesAsync(ct);
 
-            var newLines = dto.Entries.Select(e => new TransactionEntry
+            var lines = dto.Entries.Select(e => new TransactionEntry
             {
                 CompanyId = companyId,
                 TransactionNo = transactionNo,
                 AccountCode = e.AccountCode,
                 LineDescription = e.Memo,
-                Debit = e.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m,
-                Credit = e.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m
+                Debit = e.Debit,
+                Credit = e.Credit
             }).ToList();
 
-            _db.TransactionEntries.AddRange(newLines);
+            _db.TransactionEntries.AddRange(lines);
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
@@ -297,11 +299,11 @@ namespace GLPack.Services
                 TransactionNo = header.TransactionNo,
                 TxnDate = header.Date,
                 Description = header.Description,
-                Entries = newLines.Select(l => new Tx.TransactionEntryDto
+                Entries = lines.Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 }).ToList()
             };

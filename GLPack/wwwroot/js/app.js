@@ -640,10 +640,10 @@
 
         function normalizeEntry(e) {
             return {
-                accountCode: e.AccountCode ?? e.accountCode ?? "",
-                amount: Number(e.Amount ?? e.amount ?? 0) || 0,
-                drCr: (e.DrCr ?? e.drCr ?? "DR").toString().toUpperCase(),
-                memo: e.Memo ?? e.memo ?? ""
+                accountCode: (e.AccountCode ?? e.accountCode ?? "").toString(),
+                debit: Number(e.Debit ?? e.debit ?? 0) || 0,
+                credit: Number(e.Credit ?? e.credit ?? 0) || 0,
+                memo: (e.Memo ?? e.memo ?? "").toString()
             };
         }
 
@@ -834,8 +834,9 @@
         }
 
         function lineRowHtml(line, idx, editable) {
-            const debit = line.drCr === "DR" ? line.amount : 0;
-            const credit = line.drCr === "CR" ? line.amount : 0;
+            const debit = Number(line.debit) || 0;
+            const credit = Number(line.credit) || 0;
+
             const options = accounts.map(a => `
               <option value="${escapeHtml(a.code)}"
                       ${a.code === (line.accountCode || "") ? "selected" : ""}>
@@ -843,12 +844,12 @@
               </option>
             `).join("");
 
-            if (!editable) {
-                return `
+                    if (!editable) {
+                        return `
                     <tr>
                       <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                       <td class="px-4 py-2">
-                        <div class="font-mono text-xs">${escapeHtml(line.accountCode)}</div>
+                        <div class="font-mono text-xs">${escapeHtml(line.accountCode || "")}</div>
                       </td>
                       <td class="px-4 py-2 text-right font-mono text-xs">${debit ? escapeHtml(debit.toFixed(2)) : "&nbsp;"}</td>
                       <td class="px-4 py-2 text-right font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
@@ -856,10 +857,9 @@
                       <td class="px-4 py-2 text-right"></td>
                     </tr>
                   `;
-            }
+                    }
 
-            // editable
-            return `
+                    return `
                   <tr data-line-index="${idx}" class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
                     <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                     <td class="px-4 py-2">
@@ -901,17 +901,14 @@
                     </td>
                   </tr>
                 `;
-        }
+                }
 
         function calcTotals(entries) {
-            return (entries || []).reduce(
-                (acc, line) => {
-                    if (line.drCr === "DR") acc.dr += line.amount || 0;
-                    else if (line.drCr === "CR") acc.cr += line.amount || 0;
-                    return acc;
-                },
-                { dr: 0, cr: 0 }
-            );
+            return entries.reduce((acc, line) => {
+                acc.dr += Number(line.debit) || 0;
+                acc.cr += Number(line.credit) || 0;
+                return acc;
+            }, { dr: 0, cr: 0 });
         }
 
         // ---------- edit helpers ----------
@@ -987,9 +984,9 @@
                 description: tx.description,
                 entries: tx.entries.map(line => ({
                     accountCode: line.accountCode,
-                    amount: line.amount,
-                    drCr: line.drCr,
-                    memo: line.memo
+                    debit: Number(line.debit) || 0,
+                    credit: Number(line.credit) || 0,
+                    memo: line.memo || null
                 }))
             };
 
@@ -1216,18 +1213,9 @@
                     const amount = Number.isFinite(value) ? value : 0;
 
                     if (field === "debit") {
-                        line.drCr = amount > 0 ? "DR" : line.drCr;
-                        line.amount = amount > 0 ? amount : 0;
-
-                        // clear credit input
-                        const creditInput = tr.querySelector('[data-field="credit"]');
-                        if (creditInput && amount > 0) creditInput.value = "";
+                        line.debit = amount;
                     } else {
-                        line.drCr = amount > 0 ? "CR" : line.drCr;
-                        line.amount = amount > 0 ? amount : 0;
-
-                        const debitInput = tr.querySelector('[data-field="debit"]');
-                        if (debitInput && amount > 0) debitInput.value = "";
+                        line.credit = amount;
                     }
                 }
 

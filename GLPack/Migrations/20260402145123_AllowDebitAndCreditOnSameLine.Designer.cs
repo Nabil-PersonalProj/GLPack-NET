@@ -3,6 +3,7 @@ using System;
 using GLPack.DAL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GLPack.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260402145123_AllowDebitAndCreditOnSameLine")]
+    partial class AllowDebitAndCreditOnSameLine
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -244,6 +247,8 @@ namespace GLPack.Migrations
                     b.ToTable("transaction_item", null, t =>
                         {
                             t.HasCheckConstraint("ck_entry_nonneg", "(debit >= 0 AND credit >= 0)");
+
+                            t.HasCheckConstraint("ck_entry_one_side", "((debit = 0 AND credit >= 0) OR (credit = 0 AND debit >= 0))");
                         });
                 });
 

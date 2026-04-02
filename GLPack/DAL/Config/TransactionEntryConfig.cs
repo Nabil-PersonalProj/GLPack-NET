@@ -38,8 +38,6 @@ namespace GLPack.DAL.Config
             b.ToTable(t =>
             {
                 t.HasCheckConstraint("ck_entry_nonneg", "(debit >= 0 AND credit >= 0)");
-                t.HasCheckConstraint("ck_entry_one_side",
-                    "((debit = 0 AND credit >= 0) OR (credit = 0 AND debit >= 0))");
             });
         }
     }
