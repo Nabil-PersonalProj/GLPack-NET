@@ -74,7 +74,7 @@
     <div id="txAlertHost" class="space-y-2"></div>
 
     <!-- Transactions table (master) -->
-    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+    <!--<div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
         <table class="min-w-full text-sm">
             <thead class="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900/60">
                 <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">
@@ -97,11 +97,7 @@
                 </tr>
             </tbody>
         </table>
-    </div>
-
-    <div class="flex items-center justify-between text-xs text-gray-500 dark:text-neutral-400">
-        <div id="txPagerSummary"></div>
-    </div>
+    </div> -->
 
     <!-- Detail: header + lines for selected transaction -->
     <div class="space-y-3">
@@ -231,6 +227,32 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Transactions table (master) -->
+    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <table class="min-w-full text-sm">
+            <thead class="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900/60">
+                <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                    <th class="px-3 py-2 w-8">
+                        <input id="chkTxSelectAll"
+                               type="checkbox"
+                               class="h-4 w-4 rounded border-gray-300 dark:border-neutral-600" />
+                    </th>
+                    <th class="px-3 py-2 w-28">Txn No</th>
+                    <th class="px-3 py-2 w-28">Date</th>
+                    <th class="px-3 py-2">Description</th>
+                    <th class="px-3 py-2 w-32 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="txTableBody" class="divide-y divide-gray-100 dark:divide-neutral-800">
+                <tr>
+                    <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                        Loading transactions...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </section>
 

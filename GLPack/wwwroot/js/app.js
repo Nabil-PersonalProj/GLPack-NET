@@ -559,7 +559,6 @@
         const fromInput = document.querySelector('#txFrom');
         const toInput = document.querySelector('#txTo');
         const alertHost = document.querySelector('#txAlertHost');
-        const pagerSummary = document.querySelector('#txPagerSummary');
 
         const btnNew = document.querySelector('#btnTxNew');
         const btnDeleteSelected = document.querySelector('#btnTxDeleteSelected');
@@ -605,12 +604,7 @@
                 });
 
                 transactions = (items || []).map(normalizeTx);
-                if (pagerSummary) {
-                    pagerSummary.textContent =
-                        transactions.length > 0
-                            ? `${transactions.length} transaction${transactions.length === 1 ? "" : "s"}`
-                            : "No transactions";
-                }
+                
                 renderMaster();
                 renderDetail(null);
             } catch (err) {
