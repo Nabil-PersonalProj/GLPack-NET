@@ -12,11 +12,11 @@ namespace GLPack.Controllers
         public AccountsController(IAccountsService svc) => _svc = svc;
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AccountDto>>> List(
-            int companyId, string? q, int page = 1, int pageSize = 50, CancellationToken ct = default)
+        public async Task<ActionResult<PagedResult<AccountDto>>> List(
+            int companyId, string? q, int page = 1, int pageSize = 10, CancellationToken ct = default)
         {
-            var items = await _svc.ListAsync(companyId, q, page, pageSize, ct);
-            return Ok(items);
+            var result = await _svc.ListAsync(companyId, q, page, pageSize, ct);
+            return Ok(result);
         }
 
         [HttpGet("{accountCode}")]
@@ -60,7 +60,6 @@ namespace GLPack.Controllers
             }
         }
 
-        // Optional hard delete
         [HttpDelete("{accountCode}")]
         public async Task<IActionResult> Delete(int companyId, string accountCode, CancellationToken ct)
         {

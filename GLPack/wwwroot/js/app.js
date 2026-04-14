@@ -179,6 +179,41 @@
     }
 
     // ---------- Accounts page ----------
+    function renderPager(host, page, pageSize, totalCount, onPageChange) {
+        if (!host) return;
+
+        const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
+        const safePage = Math.min(Math.max(1, page), totalPages);
+
+        host.innerHTML = `
+            <div class="text-xs text-gray-500 dark:text-neutral-400">
+                Page ${safePage} of ${totalPages} · ${totalCount} item(s)
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        data-page="prev"
+                        class="rounded border border-gray-300 dark:border-neutral-700 px-3 py-1 text-xs ${safePage <= 1 ? 'opacity-40 cursor-not-allowed' : ''}"
+                        ${safePage <= 1 ? 'disabled' : ''}>
+                    Previous
+                </button>
+                <button type="button"
+                        data-page="next"
+                        class="rounded border border-gray-300 dark:border-neutral-700 px-3 py-1 text-xs ${safePage >= totalPages ? 'opacity-40 cursor-not-allowed' : ''}"
+                        ${safePage >= totalPages ? 'disabled' : ''}>
+                    Next
+                </button>
+            </div>
+        `;
+
+        host.querySelector('[data-page="prev"]')?.addEventListener('click', () => {
+            if (safePage > 1) onPageChange(safePage - 1);
+        });
+
+        host.querySelector('[data-page="next"]')?.addEventListener('click', () => {
+            if (safePage < totalPages) onPageChange(safePage + 1);
+        });
+    }
+
     function initAccountsIndex() {
         const info = window.__page__ || {};
         const companyId = info.companyId;
@@ -190,17 +225,33 @@
         const btnAdd = document.querySelector('#btnAddAccountRow');
         const btnDelete = document.querySelector('#btnDeleteAccounts');
         const chkSelectAll = document.querySelector('#chkAccountsSelectAll');
+        const pagerHost = document.querySelector('#accountsPager');
 
         if (!companyId || !tbody) return;
 
-        let rows = []; // state: array of {accountCode, name, type, isActive, createdAt, _mode, _selected, _orig}
+        let rows = [];
+        let currentPage = 1;
+        let pageSize = 10;
+        let totalCount = 0;
 
         // ---------- load ----------
         async function load() {
             try {
-                const data = await API.getAccounts(companyId, { page: 1, pageSize: 500 });
-                rows = (data || []).map(normalizeAccount);
+                const result = await API.getAccounts(companyId, {
+                    q: (searchInput?.value || "").trim(),
+                    page: currentPage,
+                    pageSize
+                });
+
+                rows = (result.items || result.Items || []).map(normalizeAccount);
+                totalCount = result.totalCount ?? result.TotalCount ?? 0;
+
                 render();
+
+                renderPager(pagerHost, currentPage, pageSize, totalCount, (nextPage) => {
+                    currentPage = nextPage;
+                    load();
+                });
             } catch (err) {
                 showAlert(alertHost, "danger", "Failed to load accounts: " + err.message);
                 tbody.innerHTML = `
@@ -210,6 +261,7 @@
                       </td>
                     </tr>
                   `;
+                if (pagerHost) pagerHost.innerHTML = "";
             }
         }
 
@@ -225,14 +277,7 @@
         }
 
         function getFilteredRowsWithIndex() {
-            const q = (searchInput?.value || "").trim().toLowerCase();
-            const result = rows.map((row, index) => ({ row, index }));
-            if (!q) return result;
-            return result.filter(({ row }) => {
-                const code = (row.accountCode || "").toLowerCase();
-                const name = (row.name || "").toLowerCase();
-                return code.includes(q) || name.includes(q);
-            });
+            return rows.map((row, index) => ({ row, index }));
         }
 
         // ---------- render ----------
@@ -479,7 +524,10 @@
         }
 
         if (searchInput) {
-            searchInput.addEventListener("input", debounce(render, 200));
+            searchInput?.addEventListener('input', debounce(() => {
+                currentPage = 1;
+                load();
+            }, 200));
         }
 
         if (chkSelectAll) {
@@ -569,54 +617,77 @@
         const detailNo = document.querySelector('#txDetailNo');
         const detailDate = document.querySelector('#txDetailDate');
         const detailDesc = document.querySelector('#txDetailDescription');
+        const btnEdit = document.querySelector('#btnTxEdit');
         const btnAddLine = document.querySelector('#btnTxAddLine');
         const btnSave = document.querySelector('#btnTxSave');
         const btnCancel = document.querySelector('#btnTxCancel');
         const totalDrEl = document.querySelector('#txTotalDebit');
         const totalCrEl = document.querySelector('#txTotalCredit');
 
-        let transactions = [];      // [{ transactionNo, txnDate, description, entries[], _mode, _selected, _orig }]
-        let selectedIndex = null;   // index in transactions[]
-        let accounts = []; //{ code, name }
+        const txMasterPager = document.querySelector('#txMasterPager');
+        const txLinesPager = document.querySelector('#txLinesPager');
+
+        let transactions = [];
+        let selectedIndex = null;
+        let editingTxIndex = null;
+        let txPage = 1;
+        let txPageSize = 10;
+        let txTotalCount = 0;
+        let detailPage = 1;
+        let detailPageSize = 10;
 
         // ---------- loading ----------
         async function loadAll() {
             try {
                 tbody.innerHTML = `
-                    <tr>
-                      <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-                        Loading transactions...
-                      </td>
-                    </tr>
-                  `;
+            <tr>
+              <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                Loading transactions...
+              </td>
+            </tr>
+        `;
+
                 renderDetail(null);
 
-                const fromVal = (fromInput?.value || "").trim();
-                const toVal = (toInput?.value || "").trim();
-                const q = (searchInput?.value || "").trim();
-
-                const { items } = await API.getTransactions(companyId, {
-                    page: 1,
-                    pageSize: 500,
-                    from: fromVal || undefined,
-                    to: toVal || undefined,
-                    q: q || undefined
+                const result = await API.getTransactions(companyId, {
+                    page: txPage,
+                    pageSize: txPageSize,
+                    q: (searchInput?.value || "").trim(),
+                    from: (fromInput?.value || "").trim(),
+                    to: (toInput?.value || "").trim()
                 });
 
-                transactions = (items || []).map(normalizeTx);
-                
+                transactions = (result.items || result.Items || []).map(normalizeTx);
+                txTotalCount = result.totalCount ?? result.TotalCount ?? 0;
+                detailPage = 1;
+
+                const visible = filteredIndexes();
+
+                if (!visible.length) {
+                    selectedIndex = null;
+                } else if (selectedIndex == null || !transactions[selectedIndex]) {
+                    selectedIndex = visible[0].index;
+                }
+
                 renderMaster();
-                renderDetail(null);
+                renderDetail(selectedIndex);
+
+                renderPager(txMasterPager, txPage, txPageSize, txTotalCount, (nextPage) => {
+                    txPage = nextPage;
+                    selectedIndex = null;
+                    loadAll();
+                });
             } catch (err) {
                 showAlert(alertHost, "danger", "Failed to load transactions: " + err.message);
                 tbody.innerHTML = `
-                    <tr>
-                      <td colspan="6" class="px-4 py-4 text-center text-red-500">
-                        Error loading transactions.
-                      </td>
-                    </tr>
-                  `;
+            <tr>
+              <td colspan="6" class="px-4 py-4 text-center text-red-500">
+                Error loading transactions.
+              </td>
+            </tr>
+        `;
                 renderDetail(null);
+                if (txMasterPager) txMasterPager.innerHTML = "";
             }
         }
 
@@ -642,20 +713,15 @@
         }
 
         function filteredIndexes() {
-            const q = (searchInput?.value || "").trim().toLowerCase();
-            const result = transactions.map((row, index) => ({ row, index }));
-            if (!q) return result;
-            return result.filter(({ row }) => {
-                const desc = (row.description || "").toLowerCase();
-                const txnNo = String(row.transactionNo || "");
-                return desc.includes(q) || txnNo.includes(q);
-            });
+            return transactions.map((row, index) => ({ row, index }));
         }
 
         async function loadAccounts() {
             try {
-                const data = await API.getAccounts(companyId, { page: 1, pageSize: 500 });
-                accounts = (data || []).map(acc => ({
+                const result = await API.getAccounts(companyId, { page: 1, pageSize: 500 });
+                const data = result.items || result.Items || [];
+
+                accounts = data.map(acc => ({
                     code: acc.accountCode ?? acc.AccountCode ?? "",
                     name: acc.name ?? acc.Name ?? ""
                 }));
@@ -678,6 +744,7 @@
                   `;
                 if (btnDeleteSelected) btnDeleteSelected.disabled = true;
                 if (chkSelectAll) chkSelectAll.checked = false;
+                if (txLinesPager) txLinesPager.innerHTML = "";
                 return;
             }
 
@@ -761,18 +828,20 @@
                     detailNo.value = "";
                     detailNo.disabled = true;
                 }
+                if (btnEdit) btnEdit.disabled = true;
                 if (btnAddLine) btnAddLine.disabled = true;
                 if (btnSave) btnSave.disabled = true;
                 if (btnCancel) btnCancel.disabled = true;
                 if (linesBody) {
                     linesBody.innerHTML = `
-                      <tr>
-                        <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-                          No transaction selected.
-                        </td>
-                      </tr>
-                    `;
+              <tr>
+                <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                  No transaction selected.
+                </td>
+              </tr>
+            `;
                 }
+                if (txLinesPager) txLinesPager.innerHTML = "";
                 if (totalDrEl) totalDrEl.textContent = "0.00";
                 if (totalCrEl) totalCrEl.textContent = "0.00";
                 renderMaster();
@@ -801,7 +870,7 @@
                 detailNo.disabled = !(tx._mode === "new");
                 detailNo.value = tx.transactionNo != null ? tx.transactionNo : "";
             }
-
+            if (btnEdit) btnEdit.disabled = isEditing;
             if (btnAddLine) btnAddLine.disabled = !isEditing;
             if (btnSave) btnSave.disabled = !isEditing;
             if (btnCancel) btnCancel.disabled = !isEditing;
@@ -810,14 +879,29 @@
 
             if (!tx.entries.length && !isEditing) {
                 linesBody.innerHTML = `
-                <tr>
-                  <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-                    This transaction has no lines.
-                  </td>
-                </tr>
-              `;
+            <tr>
+              <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                This transaction has no lines.
+              </td>
+            </tr>
+          `;
+                if (txLinesPager) txLinesPager.innerHTML = "";
             } else {
-                linesBody.innerHTML = tx.entries.map((line, idx) => lineRowHtml(line, idx, isEditing)).join("");
+                const totalLineCount = tx.entries.length;
+                const totalDetailPages = Math.max(1, Math.ceil(totalLineCount / detailPageSize));
+                detailPage = Math.min(Math.max(1, detailPage), totalDetailPages);
+
+                const start = (detailPage - 1) * detailPageSize;
+                const visibleLines = tx.entries.slice(start, start + detailPageSize);
+
+                linesBody.innerHTML = visibleLines
+                    .map((line, idx) => lineRowHtml(line, start + idx, isEditing))
+                    .join("");
+
+                renderPager(txLinesPager, detailPage, detailPageSize, totalLineCount, (nextPage) => {
+                    detailPage = nextPage;
+                    renderDetail(selectedIndex);
+                });
             }
 
             const totals = calcTotals(tx.entries);
@@ -926,6 +1010,7 @@
             }
             tx._mode = isNew ? "new" : "edit";
             selectedIndex = index;
+            detailPage = 1;
             renderDetail(index);
         }
 
@@ -1077,6 +1162,7 @@
                     _orig: null
                 };
                 transactions.unshift(newTx);
+                detailPage = 1;
                 startEdit(0, true);
             });
         }
@@ -1087,9 +1173,23 @@
             });
         }
 
-        if (searchInput) searchInput.addEventListener("input", debounce(() => { renderMaster(); }, 200));
-        if (fromInput) fromInput.addEventListener("change", () => loadAll());
-        if (toInput) toInput.addEventListener("change", () => loadAll());
+        searchInput?.addEventListener('input', debounce(() => {
+            txPage = 1;
+            selectedIndex = null;
+            loadAll();
+        }, 200));
+
+        fromInput?.addEventListener('change', () => {
+            txPage = 1;
+            selectedIndex = null;
+            loadAll();
+        });
+
+        toInput?.addEventListener('change', () => {
+            txPage = 1;
+            selectedIndex = null;
+            loadAll();
+        });
 
         if (chkSelectAll) {
             chkSelectAll.addEventListener("change", () => {
@@ -1125,6 +1225,7 @@
             }
 
             // default click = select row
+            detailPage = 1;
             renderDetail(index);
         });
 
@@ -1156,13 +1257,20 @@
                 renderMaster();
             });
         }
-
+        if (btnEdit) {
+            btnEdit.addEventListener("click", () => {
+                if (selectedIndex == null) return;
+                startEdit(selectedIndex, false);
+            });
+        }
         if (btnAddLine) {
             btnAddLine.addEventListener("click", () => {
                 if (selectedIndex == null) return;
                 const tx = transactions[selectedIndex];
                 if (!tx) return;
                 tx.entries.push(normalizeEntry({}));
+                const totalDetailPages = Math.max(1, Math.ceil(tx.entries.length / detailPageSize));
+                detailPage = totalDetailPages;
                 renderDetail(selectedIndex);
             });
         }
@@ -1233,6 +1341,8 @@
                     const tx = transactions[selectedIndex];
                     if (!tx) return;
                     tx.entries.splice(idx, 1);
+                    const totalDetailPages = Math.max(1, Math.ceil(tx.entries.length / detailPageSize));
+                    detailPage = Math.min(detailPage, totalDetailPages);
                     renderDetail(selectedIndex);
                 }
             });

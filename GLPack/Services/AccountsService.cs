@@ -29,14 +29,20 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<IReadOnlyList<AccountDto>> ListAsync(int companyId, string? q, int page, int pageSize, CancellationToken ct)
+        public async Task<PagedResult<AccountDto>> ListAsync(int companyId, string? q, int page, int pageSize, CancellationToken ct)
         {
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize < 1 ? 10 : pageSize;
+
             var query = _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId);
+
             if (!string.IsNullOrWhiteSpace(q))
             {
                 q = q.Trim();
                 query = query.Where(a => a.Code.Contains(q) || a.Name.Contains(q));
             }
+
+            var totalCount = await query.CountAsync(ct);
 
             var items = await query
                 .OrderBy(a => a.Code)
@@ -52,7 +58,13 @@ namespace GLPack.Services
                 })
                 .ToListAsync(ct);
 
-            return items;
+            return new PagedResult<AccountDto>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
         }
 
         public async Task<AccountDto> CreateAsync(AccountUpsertDto dto, CancellationToken ct)

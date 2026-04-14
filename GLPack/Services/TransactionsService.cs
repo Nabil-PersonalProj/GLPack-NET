@@ -28,9 +28,6 @@ namespace GLPack.Services
             {
                 if (entry.Debit < 0m || entry.Credit < 0m)
                     throw new ArgumentException("Entry debit and credit must be zero or positive.");
-
-                if (entry.Debit == 0m && entry.Credit == 0m)
-                    throw new ArgumentException("Each entry must have either a debit, a credit, or both.");
             }
 
             var totalDr = dto.Entries.Sum(e => e.Debit);
@@ -154,46 +151,73 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<(IReadOnlyList<Tx.TransactionDto> Items, int Total)> ListAsync(
-        int companyId, int page, int pageSize, DateTime? from, DateTime? to, CancellationToken ct)
+        public async Task<(IReadOnlyList<Tx.TransactionDto> Items, int Total)> ListAsync(int companyId, int page, int pageSize, string? q, DateTime? from, DateTime? to, CancellationToken ct)
         {
-            var q = _db.Transactions.AsNoTracking().Where(t => t.CompanyId == companyId);
-            if (from.HasValue) q = q.Where(t => t.Date >= from.Value.Date);
-            if (to.HasValue) q = q.Where(t => t.Date < to.Value.Date.AddDays(1));
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize < 1 ? 10 : pageSize;
 
-            var total = await q.CountAsync(ct);
+            var query = _db.Transactions
+                .AsNoTracking()
+                .Where(t => t.CompanyId == companyId);
 
-            var headers = await q.OrderByDescending(t => t.Date)
-                .ThenBy(t => t.TransactionNo)
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                q = q.Trim();
+
+                query = query.Where(t =>
+                    t.TransactionNo.ToString().Contains(q) ||
+                    (t.Description != null && t.Description.Contains(q)));
+            }
+
+            if (from.HasValue)
+                query = query.Where(t => t.Date >= from.Value.Date);
+
+            if (to.HasValue)
+                query = query.Where(t => t.Date < to.Value.Date.AddDays(1));
+
+            var total = await query.CountAsync(ct);
+
+            var headers = await query
+                .OrderByDescending(t => t.Date)
+                .ThenByDescending(t => t.TransactionNo)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);
 
-            var txnNos = headers.Select(h => h.TransactionNo).ToArray();
+            var transactionNos = headers.Select(t => t.TransactionNo).ToList();
 
-            var allLines = await _db.TransactionEntries.AsNoTracking()
-                .Where(l => l.CompanyId == companyId && txnNos.Contains(l.TransactionNo))
-                .OrderBy(l => l.TransactionNo).ThenBy(l => l.Id)
+            var lines = await _db.TransactionEntries
+                .AsNoTracking()
+                .Where(i => i.CompanyId == companyId && transactionNos.Contains(i.TransactionNo))
+                .OrderBy(i => i.TransactionNo)
+                .ThenBy(i => i.Id)
                 .ToListAsync(ct);
 
-            var grouped = allLines.GroupBy(l => l.TransactionNo).ToDictionary(
-                g => g.Key,
-                g => g.Select(l => new Tx.TransactionEntryDto
-                {
-                    AccountCode = l.AccountCode,
-                    Debit = l.Debit,
-                    Credit = l.Credit,
-                    Memo = l.LineDescription
-                }).ToList());
+            var linesLookup = lines
+                .GroupBy(x => x.TransactionNo)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<Tx.TransactionEntryDto>)g.Select(x => new Tx.TransactionEntryDto
+                    {
+                        AccountCode = x.AccountCode,
+                        Debit = x.Debit,
+                        Credit = x.Credit,
+                        Memo = x.LineDescription
+                    }).ToList()
+                );
 
-            var items = headers.Select(h => new Tx.TransactionDto
-            {
-                CompanyId = h.CompanyId,
-                TransactionNo = h.TransactionNo,
-                TxnDate = h.Date,
-                Description = h.Description,
-                Entries = grouped.TryGetValue(h.TransactionNo, out var es) ? es : new List<Tx.TransactionEntryDto>()
-            }).ToList();
+            var items = headers
+                .Select(t => new Tx.TransactionDto
+                {
+                    CompanyId = t.CompanyId,
+                    TransactionNo = t.TransactionNo,
+                    TxnDate = t.Date,
+                    Description = t.Description,
+                    Entries = linesLookup.TryGetValue(t.TransactionNo, out var entries)
+                        ? entries
+                        : Array.Empty<Tx.TransactionEntryDto>()
+                })
+                .ToList();
 
             return (items, total);
         }
@@ -213,9 +237,6 @@ namespace GLPack.Services
             {
                 if (e.Debit < 0m || e.Credit < 0m)
                     throw new InvalidOperationException("All debit and credit amounts must be zero or positive.");
-
-                if (e.Debit == 0m && e.Credit == 0m)
-                    throw new InvalidOperationException("Each entry must have either a debit, a credit, or both.");
             }
             var totalDr = dto.Entries.Sum(x => x.Debit);
             var totalCr = dto.Entries.Sum(x => x.Credit);
