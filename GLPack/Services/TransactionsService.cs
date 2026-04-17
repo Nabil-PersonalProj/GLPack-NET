@@ -2,6 +2,7 @@
 using GLPack.DAL;                 // <-- ensure this matches your AppDbContext namespace
 using GLPack.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileSystemGlobbing.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -151,7 +152,7 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<(IReadOnlyList<Tx.TransactionDto> Items, int Total)> ListAsync(int companyId, int page, int pageSize, string? q, DateTime? from, DateTime? to, CancellationToken ct)
+        public async Task<(IReadOnlyList<Tx.TransactionDto> Items, int Total)> ListAsync(int companyId, int page, int pageSize, string? q, int? transactionNo, DateTime? from, DateTime? to, CancellationToken ct)
         {
             page = page < 1 ? 1 : page;
             pageSize = pageSize < 1 ? 10 : pageSize;
@@ -159,14 +160,26 @@ namespace GLPack.Services
             var query = _db.Transactions
                 .AsNoTracking()
                 .Where(t => t.CompanyId == companyId);
-
-            if (!string.IsNullOrWhiteSpace(q))
+            if (transactionNo.HasValue)
+            {
+                query = query.Where(t => t.TransactionNo == transactionNo.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(q))
             {
                 q = q.Trim();
+                var pattern = $"%{q}%";
 
                 query = query.Where(t =>
-                    t.TransactionNo.ToString().Contains(q) ||
-                    (t.Description != null && t.Description.Contains(q)));
+                    EF.Functions.ILike(t.TransactionNo.ToString(), pattern) ||
+                    (t.Description != null && EF.Functions.ILike(t.Description, pattern)) ||
+                    _db.TransactionEntries.Any(e =>
+                        e.CompanyId == t.CompanyId &&
+                        e.TransactionNo == t.TransactionNo &&
+                        (
+                            EF.Functions.ILike(e.AccountCode, pattern) ||
+                            (e.LineDescription != null && EF.Functions.ILike(e.LineDescription, pattern))
+                        )
+                    ));
             }
 
             if (from.HasValue)

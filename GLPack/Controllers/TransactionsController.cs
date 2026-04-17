@@ -20,9 +20,10 @@ namespace GLPack.Controllers
             string? q = null,
             DateTime? from = null,
             DateTime? to = null,
+            int? transactionNo = null,
             CancellationToken ct = default)
         {
-            var (items, total) = await _svc.ListAsync(companyId, page, pageSize, q, from, to, ct);
+            var (items, total) = await _svc.ListAsync(companyId, page, pageSize, q, transactionNo, from, to, ct);
 
             return Ok(new PagedResult<Tx.TransactionDto>
             {

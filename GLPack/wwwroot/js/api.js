@@ -44,7 +44,6 @@
     }
 
     // ----- Companies API -----
-
     function getCompanies() {
         // hits GET /api/companies
         return request("/api/companies");
@@ -71,7 +70,6 @@
     }
 
     // ----- Accounts API -----
-
     function getAccounts(companyId, opts = {}) {
         const { q = "", page = 1, pageSize = 10 } = opts;
         const params = new URLSearchParams();
@@ -108,6 +106,7 @@
             page = 1,
             pageSize = 10,
             q = "",
+            transactionNo = null,
             from = "",
             to = ""
         } = opts;
@@ -118,6 +117,7 @@
         if (q) params.set("q", q);
         if (from) params.set("from", from);
         if (to) params.set("to", to);
+        if (transactionNo != null) params.set("transactionNo", String(transactionNo));
 
         return request(`/api/companies/${companyId}/transactions?` + params.toString());
     }
@@ -143,7 +143,6 @@
     }
 
     // ----- Accounts API -----
-
     function ledgerSearch(companyId, opts = {}) {
         const {
             q = "",

@@ -608,6 +608,17 @@
         const toInput = document.querySelector('#txTo');
         const alertHost = document.querySelector('#txAlertHost');
 
+        const exactFilterHost = document.querySelector('#txExactFilterHost');
+        const pageUrl = new URL(window.location.href);
+        const transactionNo0 = pageUrl.searchParams.get("transactionNo");
+        let exactTransactionNo = transactionNo0 != null && transactionNo0 !== ""
+            ? Number(transactionNo0)
+            : null;
+
+        if (exactTransactionNo != null && Number.isNaN(exactTransactionNo)) {
+            exactTransactionNo = null;
+        }
+
         const btnNew = document.querySelector('#btnTxNew');
         const btnDeleteSelected = document.querySelector('#btnTxDeleteSelected');
         const chkSelectAll = document.querySelector('#chkTxSelectAll');
@@ -645,7 +656,7 @@
                 Loading transactions...
               </td>
             </tr>
-        `;
+            `;
 
                 renderDetail(null);
 
@@ -653,6 +664,7 @@
                     page: txPage,
                     pageSize: txPageSize,
                     q: (searchInput?.value || "").trim(),
+                    transactionNo: exactTransactionNo,
                     from: (fromInput?.value || "").trim(),
                     to: (toInput?.value || "").trim()
                 });
@@ -689,6 +701,42 @@
                 renderDetail(null);
                 if (txMasterPager) txMasterPager.innerHTML = "";
             }
+        }
+
+        function renderExactTransactionFilter() {
+            if (!exactFilterHost) return;
+
+            if (exactTransactionNo == null) {
+                exactFilterHost.innerHTML = "";
+                return;
+            }
+
+            exactFilterHost.innerHTML = `
+              <span class="inline-flex items-center gap-2 rounded-full border border-indigo-300/40 bg-indigo-50
+                           dark:bg-indigo-950/40 px-3 py-1 text-xs text-indigo-700 dark:text-indigo-200">
+                Transaction No.: ${escapeHtml(String(exactTransactionNo))}
+                <button id="btnClearExactTransactionFilter"
+                        type="button"
+                        class="font-semibold hover:opacity-80"
+                        aria-label="Clear exact transaction filter">
+                  ×
+                </button>
+              </span>
+            `;
+
+            const btn = document.querySelector('#btnClearExactTransactionFilter');
+            btn?.addEventListener('click', () => {
+                exactTransactionNo = null;
+
+                const next = new URL(window.location.href);
+                next.searchParams.delete("transactionNo");
+                window.history.replaceState({}, "", next.toString());
+
+                txPage = 1;
+                selectedIndex = null;
+                renderExactTransactionFilter();
+                loadAll();
+            });
         }
 
         function normalizeTx(tx) {
@@ -927,10 +975,13 @@
                     <tr>
                       <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                       <td class="px-4 py-2">
-                        <div class="font-mono text-xs">${escapeHtml(line.accountCode || "")}</div>
+                        <div class="font-mono text-xs">
+                        <a href="/company/${companyId}/search?q=${encodeURIComponent(line.accountCode || "")}" class="text-indigo-600 hover:underline">
+                            ${escapeHtml(line.accountCode || "")}
+                        </a></div>
                       </td>
                       <td class="px-4 py-2 text-right font-mono text-xs">${debit ? escapeHtml(debit.toFixed(2)) : "&nbsp;"}</td>
-                      <td class="px-4 py-2 text-right font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
+                      <td class="px-4 py-2 text-left font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
                       <td class="px-4 py-2 text-xs text-gray-600 dark:text-neutral-300">${escapeHtml(line.memo || "")}</td>
                       <td class="px-4 py-2 text-right"></td>
                     </tr>
@@ -961,7 +1012,7 @@
                              type="number"
                              step="0.01"
                              class="w-24 rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                    px-2 py-1 text-xs text-right font-mono"
+                                    px-2 py-1 text-xs text-left font-mono"
                              value="${credit ? escapeHtml(credit.toString()) : ""}" />
                     </td>
                     <td class="px-4 py-2">
@@ -1174,6 +1225,13 @@
         }
 
         searchInput?.addEventListener('input', debounce(() => {
+            if (exactTransactionNo != null) {
+                exactTransactionNo = null;
+                const next = new URL(window.location.href);
+                next.searchParams.delete("transactionNo");
+                window.history.replaceState({}, "", next.toString());
+                renderExactTransactionFilter();
+            }
             txPage = 1;
             selectedIndex = null;
             loadAll();
@@ -1349,6 +1407,7 @@
         }
 
         (async () => {
+            renderExactTransactionFilter();
             await loadAccounts();
             await loadAll();
         })();
@@ -1400,9 +1459,9 @@
 
             if (!results.length) {
                 tbody.innerHTML = `
-      <tr>
-        <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
-      </tr>`;
+                  <tr>
+                    <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
+                  </tr>`;
                 return;
             }
 
@@ -1412,32 +1471,31 @@
             };
 
             tbody.innerHTML = results.map(r => {
-                const date = escapeHtml((r.date || r.Date || "").toString().slice(0, 10));
                 const txNo = r.transactionNo ?? r.TransactionNo;
-                const txDesc = escapeHtml(r.transactionDescription ?? r.TransactionDescription ?? "");
-                const accCode = escapeHtml(r.accountCode ?? r.AccountCode ?? "");
-                const accName = escapeHtml(r.accountName ?? r.AccountName ?? "");
-                const line = escapeHtml(r.lineDescription ?? r.LineDescription ?? "");
+                const accCodeRaw = r.accountCode ?? r.AccountCode ?? "";
+                const accCode = escapeHtml(accCodeRaw);
+                const lineRaw = r.lineDescription ?? r.LineDescription ?? "";
+                const txDescRaw = r.transactionDescription ?? r.TransactionDescription ?? "";
+                const description = escapeHtml(lineRaw || txDescRaw || "-");
                 const debit = money(r.debit ?? r.Debit);
                 const credit = money(r.credit ?? r.Credit);
 
-                const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCode)}`;
-                const txHref = `/company/${companyId}/search?transactionNo=${encodeURIComponent(String(txNo))}`;
+                const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCodeRaw)}`;
+                const txHref = `/company/${companyId}/transactions?transactionNo=${encodeURIComponent(String(txNo))}`;
 
                 return `
                     <tr class="border-b border-zinc-800 hover:bg-zinc-900/60">
-                    <td class="px-4 py-3 text-sm">
-                        <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
-                            href="${accHref}">${accCode} — ${accName}</a>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                        <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
-                            href="${txHref}">${date} • TX #${escapeHtml(String(txNo))}</a>
-                        <div class="text-xs text-zinc-500 mt-1">${txDesc}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm text-zinc-300">${line}</td>
-                    <td class="px-4 py-3 text-sm text-right font-mono">${escapeHtml(debit)}</td>
-                    <td class="px-4 py-3 text-sm text-right font-mono">${escapeHtml(credit)}</td>
+                        <td class="px-4 py-3 text-xs">
+                            <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                               href="${txHref}">${escapeHtml(String(txNo))}</a>
+                        </td>
+                        <td class="px-4 py-3 text-xs">
+                            <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                               href="${accHref}">${accCode}</a>
+                        </td>
+                        <td class="px-4 py-3 text-xs text-zinc-300">${description}</td>
+                        <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
+                        <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
                     </tr>`;
                         }).join("");
         }
