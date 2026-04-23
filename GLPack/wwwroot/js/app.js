@@ -166,16 +166,11 @@
 
         // For now, just show a simple message using server-provided info.
         if (accountsPreview) {
-            accountsPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}). Accounts preview coming soon.`;
+            accountsPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}).`;
         }
         if (txPreview) {
-            txPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}). Transactions preview coming soon.`;
+            txPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}).`;
         }
-
-        // Later: here is where we will call
-        //   API.listAccounts(companyId, { page: 1, pageSize: 5 })
-        //   API.listTransactions(companyId, { page: 1, pageSize: 5 })
-        // and render into #accountsPreview / #transactionsPreview.
     }
 
     // ---------- Accounts page ----------
@@ -610,13 +605,12 @@
 
         const exactFilterHost = document.querySelector('#txExactFilterHost');
         const pageUrl = new URL(window.location.href);
-        const transactionNo0 = pageUrl.searchParams.get("transactionNo");
-        let exactTransactionNo = transactionNo0 != null && transactionNo0 !== ""
-            ? Number(transactionNo0)
+        const focusTx0 = pageUrl.searchParams.get("focusTx");
+        let focusTransactionNo = focusTx0 != null && focusTx0 !== ""
+            ? Number(focusTx0)
             : null;
-
-        if (exactTransactionNo != null && Number.isNaN(exactTransactionNo)) {
-            exactTransactionNo = null;
+        if (focusTransactionNo != null && Number.isNaN(focusTransactionNo)) {
+            focusTransactionNo = null;
         }
 
         const btnNew = document.querySelector('#btnTxNew');
@@ -638,6 +632,15 @@
         const txMasterPager = document.querySelector('#txMasterPager');
         const txLinesPager = document.querySelector('#txLinesPager');
 
+        const quickAccountModal = document.querySelector('#txQuickAccountModal');
+        const btnCloseQuickAccountModal = document.querySelector('#btnCloseTxQuickAccountModal');
+        const btnCancelQuickAccount = document.querySelector('#btnCancelTxQuickAccount');
+        const btnSaveQuickAccount = document.querySelector('#btnSaveTxQuickAccount');
+
+        const quickAccountCode = document.querySelector('#txQuickAccountCode');
+        const quickAccountName = document.querySelector('#txQuickAccountName');
+        const quickAccountType = document.querySelector('#txQuickAccountType');
+
         let transactions = [];
         let selectedIndex = null;
         let editingTxIndex = null;
@@ -646,6 +649,7 @@
         let txTotalCount = 0;
         let detailPage = 1;
         let detailPageSize = 10;
+        let pendingAccountLineIndex = null;
 
         // ---------- loading ----------
         async function loadAll() {
@@ -664,7 +668,6 @@
                     page: txPage,
                     pageSize: txPageSize,
                     q: (searchInput?.value || "").trim(),
-                    transactionNo: exactTransactionNo,
                     from: (fromInput?.value || "").trim(),
                     to: (toInput?.value || "").trim()
                 });
@@ -677,8 +680,12 @@
 
                 if (!visible.length) {
                     selectedIndex = null;
-                } else if (selectedIndex == null || !transactions[selectedIndex]) {
-                    selectedIndex = visible[0].index;
+                } else {
+                    const focused = applyFocusTransaction();
+
+                    if (!focused && (selectedIndex == null || !transactions[selectedIndex])) {
+                        selectedIndex = visible[0].index;
+                    }
                 }
 
                 renderMaster();
@@ -706,7 +713,7 @@
         function renderExactTransactionFilter() {
             if (!exactFilterHost) return;
 
-            if (exactTransactionNo == null) {
+            if (focusTransactionNo == null) {
                 exactFilterHost.innerHTML = "";
                 return;
             }
@@ -714,11 +721,11 @@
             exactFilterHost.innerHTML = `
               <span class="inline-flex items-center gap-2 rounded-full border border-indigo-300/40 bg-indigo-50
                            dark:bg-indigo-950/40 px-3 py-1 text-xs text-indigo-700 dark:text-indigo-200">
-                Transaction No.: ${escapeHtml(String(exactTransactionNo))}
+                Focused Transaction No.: ${escapeHtml(String(focusTransactionNo))}
                 <button id="btnClearExactTransactionFilter"
                         type="button"
                         class="font-semibold hover:opacity-80"
-                        aria-label="Clear exact transaction filter">
+                        aria-label="Clear focused transaction">
                   ×
                 </button>
               </span>
@@ -726,14 +733,12 @@
 
             const btn = document.querySelector('#btnClearExactTransactionFilter');
             btn?.addEventListener('click', () => {
-                exactTransactionNo = null;
+                focusTransactionNo = null;
 
                 const next = new URL(window.location.href);
-                next.searchParams.delete("transactionNo");
+                next.searchParams.delete("focusTx");
                 window.history.replaceState({}, "", next.toString());
 
-                txPage = 1;
-                selectedIndex = null;
                 renderExactTransactionFilter();
                 loadAll();
             });
@@ -760,6 +765,26 @@
             };
         }
 
+        function applyFocusTransaction() {
+            if (focusTransactionNo == null) return false;
+
+            const matchIndex = transactions.findIndex(t =>
+                Number(t.transactionNo) === Number(focusTransactionNo)
+            );
+
+            if (matchIndex === -1) return false;
+
+            selectedIndex = matchIndex;
+            detailPage = 1;
+
+            requestAnimationFrame(() => {
+                const row = tbody?.querySelector(`tr[data-index="${matchIndex}"]`);
+                row?.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+
+            return true;
+        }
+
         function filteredIndexes() {
             return transactions.map((row, index) => ({ row, index }));
         }
@@ -772,7 +797,10 @@
                 accounts = data.map(acc => ({
                     code: acc.accountCode ?? acc.AccountCode ?? "",
                     name: acc.name ?? acc.Name ?? ""
-                }));
+                }))
+                .sort((a, b) =>
+                        String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: "base" })
+                );
             } catch (err) {
                 console.warn("Failed to load accounts for dropdown", err);
             }
@@ -993,11 +1021,12 @@
                     <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                     <td class="px-4 py-2">
                       <select data-field="accountCode"
-                              class="w-full rounded border border-gray-300 dark:border-neutral-700
-                                     bg-white dark:bg-neutral-900 px-2 py-1 text-xs">
-                        <option value="">Select account…</option>
-                        ${options}
-                      </select>
+                                class="w-full rounded border border-gray-300 dark:border-neutral-700
+                                       bg-white dark:bg-neutral-900 px-2 py-1 text-xs">
+                          <option value="">Select account…</option>
+                          <option value="__add_new_account__">+ Add new account...</option>
+                          ${options}
+                        </select>
                     </td>
                     <td class="px-4 py-2 text-right">
                       <input data-field="debit"
@@ -1197,7 +1226,88 @@
                 const n = Number(t.transactionNo);
                 if (Number.isFinite(n) && n > max) max = n;
             }
-            return max > 0 ? max + 1 : 2001; // or 1, or whatever starting point you like
+            return max > 0 ? max + 1 : 1;
+        }
+
+        function openQuickAccountModal(lineIndex) {
+            pendingAccountLineIndex = lineIndex;
+
+            if (quickAccountCode) quickAccountCode.value = "";
+            if (quickAccountName) quickAccountName.value = "";
+            if (quickAccountType) quickAccountType.value = "";
+
+            quickAccountModal?.classList.remove("hidden");
+            quickAccountModal?.classList.add("flex");
+
+            setTimeout(() => quickAccountCode?.focus(), 0);
+        }
+
+        function closeQuickAccountModal() {
+            quickAccountModal?.classList.add("hidden");
+            quickAccountModal?.classList.remove("flex");
+            pendingAccountLineIndex = null;
+        }
+
+        async function saveQuickAccountFromModal() {
+            const code = (quickAccountCode?.value || "").trim();
+            const name = (quickAccountName?.value || "").trim();
+            const type = (quickAccountType?.value || "").trim();
+
+            if (!code) {
+                showAlert(alertHost, "danger", "Account code is required.");
+                quickAccountCode?.focus();
+                return;
+            }
+
+            if (!name) {
+                showAlert(alertHost, "danger", "Account name is required.");
+                quickAccountName?.focus();
+                return;
+            }
+
+            if (!type) {
+                showAlert(alertHost, "danger", "Account type is required.");
+                quickAccountType?.focus();
+                return;
+            }
+
+            try {
+                const created = await API.createAccount(companyId, {
+                    accountCode: code,
+                    name,
+                    type,
+                    isActive: true
+                });
+
+                const createdCode = created?.accountCode ?? created?.AccountCode ?? code;
+                const createdName = created?.name ?? created?.Name ?? name;
+
+                const exists = accounts.some(a => a.code === createdCode);
+                if (!exists) {
+                    accounts.push({
+                        code: createdCode,
+                        name: createdName
+                    });
+
+                    accounts.sort((a, b) =>
+                        String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: "base" })
+                    );
+                }
+
+                if (selectedIndex != null && pendingAccountLineIndex != null) {
+                    const tx = transactions[selectedIndex];
+                    const line = tx?.entries?.[pendingAccountLineIndex];
+                    if (line) {
+                        line.accountCode = createdCode;
+                    }
+                }
+
+                closeQuickAccountModal();
+                renderDetail(selectedIndex);
+                showAlert(alertHost, "success", `Account ${createdCode} created.`);
+            } catch (err) {
+                showAlert(alertHost, "danger", "Failed to create account: " + err.message);
+            }
         }
 
         // ---------- events ----------
@@ -1225,13 +1335,6 @@
         }
 
         searchInput?.addEventListener('input', debounce(() => {
-            if (exactTransactionNo != null) {
-                exactTransactionNo = null;
-                const next = new URL(window.location.href);
-                next.searchParams.delete("transactionNo");
-                window.history.replaceState({}, "", next.toString());
-                renderExactTransactionFilter();
-            }
             txPage = 1;
             selectedIndex = null;
             loadAll();
@@ -1358,8 +1461,15 @@
                 if (!line) return;
 
                 if (field === "accountCode") {
-                    // dropdown change
-                    line.accountCode = e.target.value;
+                    const newValue = e.target.value;
+
+                    if (newValue === "__add_new_account__") {
+                        e.target.value = line.accountCode || "";
+                        openQuickAccountModal(idx);
+                        return;
+                    }
+
+                    line.accountCode = newValue;
                     return;
                 }
 
@@ -1405,6 +1515,22 @@
                 }
             });
         }
+
+        btnCloseQuickAccountModal?.addEventListener("click", closeQuickAccountModal);
+        btnCancelQuickAccount?.addEventListener("click", closeQuickAccountModal);
+        btnSaveQuickAccount?.addEventListener("click", saveQuickAccountFromModal);
+
+        quickAccountModal?.addEventListener("click", (e) => {
+            if (e.target === quickAccountModal) {
+                closeQuickAccountModal();
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && quickAccountModal && !quickAccountModal.classList.contains("hidden")) {
+                closeQuickAccountModal();
+            }
+        });
 
         (async () => {
             renderExactTransactionFilter();
@@ -1481,7 +1607,7 @@
                 const credit = money(r.credit ?? r.Credit);
 
                 const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCodeRaw)}`;
-                const txHref = `/company/${companyId}/transactions?transactionNo=${encodeURIComponent(String(txNo))}`;
+                const txHref = `/company/${companyId}/transactions?focusTx=${encodeURIComponent(String(txNo))}`;
 
                 return `
                     <tr class="border-b border-zinc-800 hover:bg-zinc-900/60">

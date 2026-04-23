@@ -18,6 +18,8 @@
         public string AccountType { get; set; } = string.Empty;
         public decimal Debit { get; set; }
         public decimal Credit { get; set; }
+        public decimal TotalDebit { get; set; }
+        public decimal TotalCredit { get; set; }
     }
 
     public sealed class ProfitLossSection

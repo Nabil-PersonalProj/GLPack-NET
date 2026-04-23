@@ -30,8 +30,16 @@ namespace GLPack.Services
                     AccountCode = g.Key.AccountCode,
                     AccountName = g.Key.Name,
                     AccountType = g.Key.Type,
-                    Debit = g.Sum(x => x.Debit),
-                    Credit = g.Sum(x => x.Credit)
+                    TotalDebit = g.Sum(x => x.Debit),
+                    TotalCredit = g.Sum(x => x.Credit)
+                })
+                .Select(x => new TrialBalanceRow
+                {
+                    AccountCode = x.AccountCode,
+                    AccountName = x.AccountName,
+                    AccountType = x.AccountType,
+                    Debit = x.TotalDebit > x.TotalCredit ? x.TotalDebit - x.TotalCredit : 0m,
+                    Credit = x.TotalCredit > x.TotalDebit ? x.TotalCredit - x.TotalDebit : 0m
                 })
                 .OrderBy(r => r.AccountCode)
                 .ToListAsync(ct);
