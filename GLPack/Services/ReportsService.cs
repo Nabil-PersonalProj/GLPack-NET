@@ -168,19 +168,19 @@ namespace GLPack.Services
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Sales" });
             rows.AddRange(salesLines);
             rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Sales", Amount = salesTotal });
-            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Cost of Sales" });
             rows.AddRange(costLines);
             rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Cost of Sales", Amount = costOfSalesTotal });
-            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "Gross Profit", Amount = grossProfit });
-            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Gross Profit", Amount = grossProfit });
+
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Expenses" });
             rows.AddRange(expenseLines);
             rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Expenses", Amount = expensesTotal });
-            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "Final Profit", Amount = finalProfit });
-            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Final Profit", Amount = finalProfit });
+
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Balance Brought Down" });
             rows.AddRange(plLines);

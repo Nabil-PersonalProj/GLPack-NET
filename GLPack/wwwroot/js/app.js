@@ -1558,6 +1558,7 @@
         const txNoParsed = transactionNo0 != null && transactionNo0 !== ""
             ? Number(transactionNo0)
             : null;
+        const tfoot = document.querySelector('#ledgerTotalsBody');
 
         if (input) input.value = q0;
 
@@ -1588,6 +1589,7 @@
                   <tr>
                     <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
                   </tr>`;
+                if (tfoot) tfoot.innerHTML = "";
                 return;
             }
 
@@ -1595,6 +1597,18 @@
                 const v = Number(n || 0);
                 return v ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
             };
+
+            const moneyZero = (n) => {
+                const v = Number(n || 0);
+                return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+
+            const totalDebit = results.reduce((sum, r) => sum + Number(r.debit || 0), 0);
+            const totalCredit = results.reduce((sum, r) => sum + Number(r.credit || 0), 0);
+
+            const net = totalDebit - totalCredit;
+            const netDebit = net > 0 ? net : 0;
+            const netCredit = net < 0 ? Math.abs(net) : 0;
 
             tbody.innerHTML = results.map(r => {
                 const txNo = r.transactionNo;
@@ -1627,7 +1641,19 @@
                         <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
                         <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
                     </tr>`;
-                        }).join("");
+                }).join("");
+
+            tfoot.innerHTML = `
+                <tr class="font-semibold">
+                    <td class="px-4 py-3 text-right" colspan="5">Total</td>
+                    <td class="px-4 py-3 text-right font-mono">${escapeHtml(moneyZero(totalDebit))}</td>
+                    <td class="px-4 py-3 text-left font-mono">${escapeHtml(moneyZero(totalCredit))}</td>
+                </tr>
+                <tr class="font-semibold border-t border-gray-200 dark:border-neutral-800">
+                    <td class="px-4 py-3 text-right" colspan="5">Net Total</td>
+                    <td class="px-4 py-3 text-right font-mono">${escapeHtml(moneyZero(netDebit))}</td>
+                    <td class="px-4 py-3 text-left font-mono">${escapeHtml(moneyZero(netCredit))}</td>
+                </tr>`;
         }
 
         // Button actions
@@ -1644,7 +1670,14 @@
                 runSearch({ q });
             });
         }
-
+        if (input) {
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    btnSearch?.click();
+                }
+            });
+        }
         if (btnClear) {
             btnClear.addEventListener("click", () => {
                 if (input) input.value = "";

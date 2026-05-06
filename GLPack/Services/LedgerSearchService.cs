@@ -26,7 +26,6 @@ namespace GLPack.Services
             q = string.IsNullOrWhiteSpace(q) ? null : q.Trim();
             accountCode = string.IsNullOrWhiteSpace(accountCode) ? null : accountCode.Trim();
 
-            // Base: ledger lines (TransactionEntry) joined with Transaction + Account
             var query =
                 from e in _db.TransactionEntries.AsNoTracking()
                 join t in _db.Transactions.AsNoTracking()
@@ -58,7 +57,9 @@ namespace GLPack.Services
                     EF.Functions.ILike(x.a.Code, $"%{q}%") ||
                     EF.Functions.ILike(x.a.Name, $"%{q}%") ||
                     (x.t.Description != null && EF.Functions.ILike(x.t.Description, $"%{q}%")) ||
-                    (x.e.LineDescription != null && EF.Functions.ILike(x.e.LineDescription, $"%{q}%"))
+                    (x.e.LineDescription != null && EF.Functions.ILike(x.e.LineDescription, $"%{q}%")) ||
+                    (qIsInt && x.e.Debit == qInt) ||
+                    (qIsInt && x.e.Credit == qInt)
                 );
             }
 
