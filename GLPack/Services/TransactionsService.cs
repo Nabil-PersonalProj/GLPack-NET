@@ -2,6 +2,7 @@
 using GLPack.DAL;                 // <-- ensure this matches your AppDbContext namespace
 using GLPack.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileSystemGlobbing.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,14 +27,12 @@ namespace GLPack.Services
 
             foreach (var entry in dto.Entries)
             {
-                if (entry.Amount < 0)
-                    throw new ArgumentException("Entry amounts must be positive.");
-                if (entry.DrCr != "DR" && entry.DrCr != "CR")
-                    throw new ArgumentException("Entry DrCr must be 'DR' or 'CR'.");
+                if (entry.Debit < 0m || entry.Credit < 0m)
+                    throw new ArgumentException("Entry debit and credit must be zero or positive.");
             }
 
-            var totalDr = dto.Entries.Where(e => e.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase)).Sum(e => e.Amount);
-            var totalCr = dto.Entries.Where(e => e.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase)).Sum(e => e.Amount);
+            var totalDr = dto.Entries.Sum(e => e.Debit);
+            var totalCr = dto.Entries.Sum(e => e.Credit);
 
             if (Math.Round(totalDr - totalCr, 2) != 0m)
             {
@@ -90,8 +89,8 @@ namespace GLPack.Services
                 TransactionNo = dto.TransactionNo,
                 AccountCode = e.AccountCode,
                 LineDescription = e.Memo,
-                Debit = e.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m,
-                Credit = e.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m
+                Debit = e.Debit,
+                Credit = e.Credit
             }).ToList();
 
             _db.TransactionEntries.AddRange(lines);
@@ -118,8 +117,8 @@ namespace GLPack.Services
                 Entries = lines.Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 }).ToList()
             };
@@ -137,8 +136,8 @@ namespace GLPack.Services
                 .Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 })
                 .ToListAsync(ct);
@@ -153,46 +152,85 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<(IReadOnlyList<Tx.TransactionDto> Items, int Total)> ListAsync(
-        int companyId, int page, int pageSize, DateTime? from, DateTime? to, CancellationToken ct)
+        public async Task<(IReadOnlyList<Tx.TransactionDto> Items, int Total)> ListAsync(int companyId, int page, int pageSize, string? q, int? transactionNo, DateTime? from, DateTime? to, CancellationToken ct)
         {
-            var q = _db.Transactions.AsNoTracking().Where(t => t.CompanyId == companyId);
-            if (from.HasValue) q = q.Where(t => t.Date >= from.Value.Date);
-            if (to.HasValue) q = q.Where(t => t.Date < to.Value.Date.AddDays(1));
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize < 1 ? 10 : pageSize;
 
-            var total = await q.CountAsync(ct);
+            var query = _db.Transactions
+                .AsNoTracking()
+                .Where(t => t.CompanyId == companyId);
+            if (transactionNo.HasValue)
+            {
+                query = query.Where(t => t.TransactionNo == transactionNo.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(q))
+            {
+                q = q.Trim();
+                var pattern = $"%{q}%";
 
-            var headers = await q.OrderByDescending(t => t.Date)
-                .ThenBy(t => t.TransactionNo)
+                query = query.Where(t =>
+                    EF.Functions.ILike(t.TransactionNo.ToString(), pattern) ||
+                    (t.Description != null && EF.Functions.ILike(t.Description, pattern)) ||
+                    _db.TransactionEntries.Any(e =>
+                        e.CompanyId == t.CompanyId &&
+                        e.TransactionNo == t.TransactionNo &&
+                        (
+                            EF.Functions.ILike(e.AccountCode, pattern) ||
+                            (e.LineDescription != null && EF.Functions.ILike(e.LineDescription, pattern))
+                        )
+                    ));
+            }
+
+            if (from.HasValue)
+                query = query.Where(t => t.Date >= from.Value.Date);
+
+            if (to.HasValue)
+                query = query.Where(t => t.Date < to.Value.Date.AddDays(1));
+
+            var total = await query.CountAsync(ct);
+
+            var headers = await query
+                .OrderByDescending(t => t.Date)
+                .ThenByDescending(t => t.TransactionNo)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);
 
-            var txnNos = headers.Select(h => h.TransactionNo).ToArray();
+            var transactionNos = headers.Select(t => t.TransactionNo).ToList();
 
-            var allLines = await _db.TransactionEntries.AsNoTracking()
-                .Where(l => l.CompanyId == companyId && txnNos.Contains(l.TransactionNo))
-                .OrderBy(l => l.TransactionNo).ThenBy(l => l.Id)
+            var lines = await _db.TransactionEntries
+                .AsNoTracking()
+                .Where(i => i.CompanyId == companyId && transactionNos.Contains(i.TransactionNo))
+                .OrderBy(i => i.TransactionNo)
+                .ThenBy(i => i.Id)
                 .ToListAsync(ct);
 
-            var grouped = allLines.GroupBy(l => l.TransactionNo).ToDictionary(
-                g => g.Key,
-                g => g.Select(l => new Tx.TransactionEntryDto
-                {
-                    AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
-                    Memo = l.LineDescription
-                }).ToList());
+            var linesLookup = lines
+                .GroupBy(x => x.TransactionNo)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<Tx.TransactionEntryDto>)g.Select(x => new Tx.TransactionEntryDto
+                    {
+                        AccountCode = x.AccountCode,
+                        Debit = x.Debit,
+                        Credit = x.Credit,
+                        Memo = x.LineDescription
+                    }).ToList()
+                );
 
-            var items = headers.Select(h => new Tx.TransactionDto
-            {
-                CompanyId = h.CompanyId,
-                TransactionNo = h.TransactionNo,
-                TxnDate = h.Date,
-                Description = h.Description,
-                Entries = grouped.TryGetValue(h.TransactionNo, out var es) ? es : new List<Tx.TransactionEntryDto>()
-            }).ToList();
+            var items = headers
+                .Select(t => new Tx.TransactionDto
+                {
+                    CompanyId = t.CompanyId,
+                    TransactionNo = t.TransactionNo,
+                    TxnDate = t.Date,
+                    Description = t.Description,
+                    Entries = linesLookup.TryGetValue(t.TransactionNo, out var entries)
+                        ? entries
+                        : Array.Empty<Tx.TransactionEntryDto>()
+                })
+                .ToList();
 
             return (items, total);
         }
@@ -210,13 +248,11 @@ namespace GLPack.Services
 
             foreach (var e in dto.Entries)
             {
-                if (e.Amount < 0m) throw new InvalidOperationException("All amounts must be positive.");
-                var side = e.DrCr?.Trim().ToUpperInvariant();
-                if (side is not ("DR" or "CR"))
-                    throw new InvalidOperationException("DrCr must be 'DR' or 'CR'.");
+                if (e.Debit < 0m || e.Credit < 0m)
+                    throw new InvalidOperationException("All debit and credit amounts must be zero or positive.");
             }
-            var totalDr = dto.Entries.Where(x => x.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
-            var totalCr = dto.Entries.Where(x => x.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
+            var totalDr = dto.Entries.Sum(x => x.Debit);
+            var totalCr = dto.Entries.Sum(x => x.Credit);
             if (Math.Round(totalDr - totalCr, 2) != 0m)
             {
                 await _appLogger.LogAsync(
@@ -265,17 +301,17 @@ namespace GLPack.Services
             _db.TransactionEntries.RemoveRange(existingLines);
             await _db.SaveChangesAsync(ct);
 
-            var newLines = dto.Entries.Select(e => new TransactionEntry
+            var lines = dto.Entries.Select(e => new TransactionEntry
             {
                 CompanyId = companyId,
                 TransactionNo = transactionNo,
                 AccountCode = e.AccountCode,
                 LineDescription = e.Memo,
-                Debit = e.DrCr.Equals("DR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m,
-                Credit = e.DrCr.Equals("CR", StringComparison.OrdinalIgnoreCase) ? e.Amount : 0m
+                Debit = e.Debit,
+                Credit = e.Credit
             }).ToList();
 
-            _db.TransactionEntries.AddRange(newLines);
+            _db.TransactionEntries.AddRange(lines);
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
@@ -297,11 +333,11 @@ namespace GLPack.Services
                 TransactionNo = header.TransactionNo,
                 TxnDate = header.Date,
                 Description = header.Description,
-                Entries = newLines.Select(l => new Tx.TransactionEntryDto
+                Entries = lines.Select(l => new Tx.TransactionEntryDto
                 {
                     AccountCode = l.AccountCode,
-                    Amount = l.Debit > 0 ? l.Debit : l.Credit,
-                    DrCr = l.Debit > 0 ? "DR" : "CR",
+                    Debit = l.Debit,
+                    Credit = l.Credit,
                     Memo = l.LineDescription
                 }).ToList()
             };

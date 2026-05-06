@@ -5,8 +5,8 @@
         public sealed class TransactionEntryDto
         {
             public required string AccountCode { get; init; }
-            public required decimal Amount { get; init; }       // always positive
-            public required string DrCr { get; init; }          // "DR" or "CR"
+            public decimal Debit { get; init; }
+            public decimal Credit { get; init; }
             public string? Memo { get; init; }
         }
 

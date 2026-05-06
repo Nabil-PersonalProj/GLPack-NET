@@ -166,19 +166,49 @@
 
         // For now, just show a simple message using server-provided info.
         if (accountsPreview) {
-            accountsPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}). Accounts preview coming soon.`;
+            accountsPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}).`;
         }
         if (txPreview) {
-            txPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}). Transactions preview coming soon.`;
+            txPreview.textContent = `Dashboard loaded for ${companyName} (ID ${companyId}).`;
         }
-
-        // Later: here is where we will call
-        //   API.listAccounts(companyId, { page: 1, pageSize: 5 })
-        //   API.listTransactions(companyId, { page: 1, pageSize: 5 })
-        // and render into #accountsPreview / #transactionsPreview.
     }
 
     // ---------- Accounts page ----------
+    function renderPager(host, page, pageSize, totalCount, onPageChange) {
+        if (!host) return;
+
+        const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
+        const safePage = Math.min(Math.max(1, page), totalPages);
+
+        host.innerHTML = `
+            <div class="text-xs text-gray-500 dark:text-neutral-400">
+                Page ${safePage} of ${totalPages} · ${totalCount} item(s)
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        data-page="prev"
+                        class="rounded border border-gray-300 dark:border-neutral-700 px-3 py-1 text-xs ${safePage <= 1 ? 'opacity-40 cursor-not-allowed' : ''}"
+                        ${safePage <= 1 ? 'disabled' : ''}>
+                    Previous
+                </button>
+                <button type="button"
+                        data-page="next"
+                        class="rounded border border-gray-300 dark:border-neutral-700 px-3 py-1 text-xs ${safePage >= totalPages ? 'opacity-40 cursor-not-allowed' : ''}"
+                        ${safePage >= totalPages ? 'disabled' : ''}>
+                    Next
+                </button>
+            </div>
+        `;
+
+        host.querySelector('[data-page="prev"]')?.addEventListener('click', () => {
+            if (safePage > 1) onPageChange(safePage - 1);
+        });
+
+        host.querySelector('[data-page="next"]')?.addEventListener('click', () => {
+            if (safePage < totalPages) onPageChange(safePage + 1);
+        });
+    }
+
     function initAccountsIndex() {
         const info = window.__page__ || {};
         const companyId = info.companyId;
@@ -190,17 +220,33 @@
         const btnAdd = document.querySelector('#btnAddAccountRow');
         const btnDelete = document.querySelector('#btnDeleteAccounts');
         const chkSelectAll = document.querySelector('#chkAccountsSelectAll');
+        const pagerHost = document.querySelector('#accountsPager');
 
         if (!companyId || !tbody) return;
 
-        let rows = []; // state: array of {accountCode, name, type, isActive, createdAt, _mode, _selected, _orig}
+        let rows = [];
+        let currentPage = 1;
+        let pageSize = 10;
+        let totalCount = 0;
 
         // ---------- load ----------
         async function load() {
             try {
-                const data = await API.getAccounts(companyId, { page: 1, pageSize: 500 });
-                rows = (data || []).map(normalizeAccount);
+                const result = await API.getAccounts(companyId, {
+                    q: (searchInput?.value || "").trim(),
+                    page: currentPage,
+                    pageSize
+                });
+
+                rows = (result.items || result.Items || []).map(normalizeAccount);
+                totalCount = result.totalCount ?? result.TotalCount ?? 0;
+
                 render();
+
+                renderPager(pagerHost, currentPage, pageSize, totalCount, (nextPage) => {
+                    currentPage = nextPage;
+                    load();
+                });
             } catch (err) {
                 showAlert(alertHost, "danger", "Failed to load accounts: " + err.message);
                 tbody.innerHTML = `
@@ -210,6 +256,7 @@
                       </td>
                     </tr>
                   `;
+                if (pagerHost) pagerHost.innerHTML = "";
             }
         }
 
@@ -225,14 +272,7 @@
         }
 
         function getFilteredRowsWithIndex() {
-            const q = (searchInput?.value || "").trim().toLowerCase();
-            const result = rows.map((row, index) => ({ row, index }));
-            if (!q) return result;
-            return result.filter(({ row }) => {
-                const code = (row.accountCode || "").toLowerCase();
-                const name = (row.name || "").toLowerCase();
-                return code.includes(q) || name.includes(q);
-            });
+            return rows.map((row, index) => ({ row, index }));
         }
 
         // ---------- render ----------
@@ -479,7 +519,10 @@
         }
 
         if (searchInput) {
-            searchInput.addEventListener("input", debounce(render, 200));
+            searchInput?.addEventListener('input', debounce(() => {
+                currentPage = 1;
+                load();
+            }, 200));
         }
 
         if (chkSelectAll) {
@@ -559,7 +602,16 @@
         const fromInput = document.querySelector('#txFrom');
         const toInput = document.querySelector('#txTo');
         const alertHost = document.querySelector('#txAlertHost');
-        const pagerSummary = document.querySelector('#txPagerSummary');
+
+        const exactFilterHost = document.querySelector('#txExactFilterHost');
+        const pageUrl = new URL(window.location.href);
+        const focusTx0 = pageUrl.searchParams.get("focusTx");
+        let focusTransactionNo = focusTx0 != null && focusTx0 !== ""
+            ? Number(focusTx0)
+            : null;
+        if (focusTransactionNo != null && Number.isNaN(focusTransactionNo)) {
+            focusTransactionNo = null;
+        }
 
         const btnNew = document.querySelector('#btnTxNew');
         const btnDeleteSelected = document.querySelector('#btnTxDeleteSelected');
@@ -570,60 +622,126 @@
         const detailNo = document.querySelector('#txDetailNo');
         const detailDate = document.querySelector('#txDetailDate');
         const detailDesc = document.querySelector('#txDetailDescription');
+        const btnEdit = document.querySelector('#btnTxEdit');
         const btnAddLine = document.querySelector('#btnTxAddLine');
         const btnSave = document.querySelector('#btnTxSave');
         const btnCancel = document.querySelector('#btnTxCancel');
         const totalDrEl = document.querySelector('#txTotalDebit');
         const totalCrEl = document.querySelector('#txTotalCredit');
 
-        let transactions = [];      // [{ transactionNo, txnDate, description, entries[], _mode, _selected, _orig }]
-        let selectedIndex = null;   // index in transactions[]
-        let accounts = []; //{ code, name }
+        const txMasterPager = document.querySelector('#txMasterPager');
+        const txLinesPager = document.querySelector('#txLinesPager');
+
+        const quickAccountModal = document.querySelector('#txQuickAccountModal');
+        const btnCloseQuickAccountModal = document.querySelector('#btnCloseTxQuickAccountModal');
+        const btnCancelQuickAccount = document.querySelector('#btnCancelTxQuickAccount');
+        const btnSaveQuickAccount = document.querySelector('#btnSaveTxQuickAccount');
+
+        const quickAccountCode = document.querySelector('#txQuickAccountCode');
+        const quickAccountName = document.querySelector('#txQuickAccountName');
+        const quickAccountType = document.querySelector('#txQuickAccountType');
+
+        let transactions = [];
+        let selectedIndex = null;
+        let editingTxIndex = null;
+        let txPage = 1;
+        let txPageSize = 10;
+        let txTotalCount = 0;
+        let detailPage = 1;
+        let detailPageSize = 10;
+        let pendingAccountLineIndex = null;
 
         // ---------- loading ----------
         async function loadAll() {
             try {
                 tbody.innerHTML = `
-                    <tr>
-                      <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-                        Loading transactions...
-                      </td>
-                    </tr>
-                  `;
+            <tr>
+              <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                Loading transactions...
+              </td>
+            </tr>
+            `;
+
                 renderDetail(null);
 
-                const fromVal = (fromInput?.value || "").trim();
-                const toVal = (toInput?.value || "").trim();
-                const q = (searchInput?.value || "").trim();
-
-                const { items } = await API.getTransactions(companyId, {
-                    page: 1,
-                    pageSize: 500,
-                    from: fromVal || undefined,
-                    to: toVal || undefined,
-                    q: q || undefined
+                const result = await API.getTransactions(companyId, {
+                    page: txPage,
+                    pageSize: txPageSize,
+                    q: (searchInput?.value || "").trim(),
+                    from: (fromInput?.value || "").trim(),
+                    to: (toInput?.value || "").trim()
                 });
 
-                transactions = (items || []).map(normalizeTx);
-                if (pagerSummary) {
-                    pagerSummary.textContent =
-                        transactions.length > 0
-                            ? `${transactions.length} transaction${transactions.length === 1 ? "" : "s"}`
-                            : "No transactions";
+                transactions = (result.items || result.Items || []).map(normalizeTx);
+                txTotalCount = result.totalCount ?? result.TotalCount ?? 0;
+                detailPage = 1;
+
+                const visible = filteredIndexes();
+
+                if (!visible.length) {
+                    selectedIndex = null;
+                } else {
+                    const focused = applyFocusTransaction();
+
+                    if (!focused && (selectedIndex == null || !transactions[selectedIndex])) {
+                        selectedIndex = visible[0].index;
+                    }
                 }
+
                 renderMaster();
-                renderDetail(null);
+                renderDetail(selectedIndex);
+
+                renderPager(txMasterPager, txPage, txPageSize, txTotalCount, (nextPage) => {
+                    txPage = nextPage;
+                    selectedIndex = null;
+                    loadAll();
+                });
             } catch (err) {
                 showAlert(alertHost, "danger", "Failed to load transactions: " + err.message);
                 tbody.innerHTML = `
-                    <tr>
-                      <td colspan="6" class="px-4 py-4 text-center text-red-500">
-                        Error loading transactions.
-                      </td>
-                    </tr>
-                  `;
+            <tr>
+              <td colspan="6" class="px-4 py-4 text-center text-red-500">
+                Error loading transactions.
+              </td>
+            </tr>
+        `;
                 renderDetail(null);
+                if (txMasterPager) txMasterPager.innerHTML = "";
             }
+        }
+
+        function renderExactTransactionFilter() {
+            if (!exactFilterHost) return;
+
+            if (focusTransactionNo == null) {
+                exactFilterHost.innerHTML = "";
+                return;
+            }
+
+            exactFilterHost.innerHTML = `
+              <span class="inline-flex items-center gap-2 rounded-full border border-indigo-300/40 bg-indigo-50
+                           dark:bg-indigo-950/40 px-3 py-1 text-xs text-indigo-700 dark:text-indigo-200">
+                Focused Transaction No.: ${escapeHtml(String(focusTransactionNo))}
+                <button id="btnClearExactTransactionFilter"
+                        type="button"
+                        class="font-semibold hover:opacity-80"
+                        aria-label="Clear focused transaction">
+                  ×
+                </button>
+              </span>
+            `;
+
+            const btn = document.querySelector('#btnClearExactTransactionFilter');
+            btn?.addEventListener('click', () => {
+                focusTransactionNo = null;
+
+                const next = new URL(window.location.href);
+                next.searchParams.delete("focusTx");
+                window.history.replaceState({}, "", next.toString());
+
+                renderExactTransactionFilter();
+                loadAll();
+            });
         }
 
         function normalizeTx(tx) {
@@ -640,31 +758,49 @@
 
         function normalizeEntry(e) {
             return {
-                accountCode: e.AccountCode ?? e.accountCode ?? "",
-                amount: Number(e.Amount ?? e.amount ?? 0) || 0,
-                drCr: (e.DrCr ?? e.drCr ?? "DR").toString().toUpperCase(),
-                memo: e.Memo ?? e.memo ?? ""
+                accountCode: (e.AccountCode ?? e.accountCode ?? "").toString(),
+                debit: Number(e.Debit ?? e.debit ?? 0) || 0,
+                credit: Number(e.Credit ?? e.credit ?? 0) || 0,
+                memo: (e.Memo ?? e.memo ?? "").toString()
             };
         }
 
-        function filteredIndexes() {
-            const q = (searchInput?.value || "").trim().toLowerCase();
-            const result = transactions.map((row, index) => ({ row, index }));
-            if (!q) return result;
-            return result.filter(({ row }) => {
-                const desc = (row.description || "").toLowerCase();
-                const txnNo = String(row.transactionNo || "");
-                return desc.includes(q) || txnNo.includes(q);
+        function applyFocusTransaction() {
+            if (focusTransactionNo == null) return false;
+
+            const matchIndex = transactions.findIndex(t =>
+                Number(t.transactionNo) === Number(focusTransactionNo)
+            );
+
+            if (matchIndex === -1) return false;
+
+            selectedIndex = matchIndex;
+            detailPage = 1;
+
+            requestAnimationFrame(() => {
+                const row = tbody?.querySelector(`tr[data-index="${matchIndex}"]`);
+                row?.scrollIntoView({ behavior: "smooth", block: "center" });
             });
+
+            return true;
+        }
+
+        function filteredIndexes() {
+            return transactions.map((row, index) => ({ row, index }));
         }
 
         async function loadAccounts() {
             try {
-                const data = await API.getAccounts(companyId, { page: 1, pageSize: 500 });
-                accounts = (data || []).map(acc => ({
+                const result = await API.getAccounts(companyId, { page: 1, pageSize: 500 });
+                const data = result.items || result.Items || [];
+
+                accounts = data.map(acc => ({
                     code: acc.accountCode ?? acc.AccountCode ?? "",
                     name: acc.name ?? acc.Name ?? ""
-                }));
+                }))
+                .sort((a, b) =>
+                        String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: "base" })
+                );
             } catch (err) {
                 console.warn("Failed to load accounts for dropdown", err);
             }
@@ -684,6 +820,7 @@
                   `;
                 if (btnDeleteSelected) btnDeleteSelected.disabled = true;
                 if (chkSelectAll) chkSelectAll.checked = false;
+                if (txLinesPager) txLinesPager.innerHTML = "";
                 return;
             }
 
@@ -767,18 +904,20 @@
                     detailNo.value = "";
                     detailNo.disabled = true;
                 }
+                if (btnEdit) btnEdit.disabled = true;
                 if (btnAddLine) btnAddLine.disabled = true;
                 if (btnSave) btnSave.disabled = true;
                 if (btnCancel) btnCancel.disabled = true;
                 if (linesBody) {
                     linesBody.innerHTML = `
-                      <tr>
-                        <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-                          No transaction selected.
-                        </td>
-                      </tr>
-                    `;
+              <tr>
+                <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                  No transaction selected.
+                </td>
+              </tr>
+            `;
                 }
+                if (txLinesPager) txLinesPager.innerHTML = "";
                 if (totalDrEl) totalDrEl.textContent = "0.00";
                 if (totalCrEl) totalCrEl.textContent = "0.00";
                 renderMaster();
@@ -807,7 +946,7 @@
                 detailNo.disabled = !(tx._mode === "new");
                 detailNo.value = tx.transactionNo != null ? tx.transactionNo : "";
             }
-
+            if (btnEdit) btnEdit.disabled = isEditing;
             if (btnAddLine) btnAddLine.disabled = !isEditing;
             if (btnSave) btnSave.disabled = !isEditing;
             if (btnCancel) btnCancel.disabled = !isEditing;
@@ -816,14 +955,29 @@
 
             if (!tx.entries.length && !isEditing) {
                 linesBody.innerHTML = `
-                <tr>
-                  <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
-                    This transaction has no lines.
-                  </td>
-                </tr>
-              `;
+            <tr>
+              <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                This transaction has no lines.
+              </td>
+            </tr>
+          `;
+                if (txLinesPager) txLinesPager.innerHTML = "";
             } else {
-                linesBody.innerHTML = tx.entries.map((line, idx) => lineRowHtml(line, idx, isEditing)).join("");
+                const totalLineCount = tx.entries.length;
+                const totalDetailPages = Math.max(1, Math.ceil(totalLineCount / detailPageSize));
+                detailPage = Math.min(Math.max(1, detailPage), totalDetailPages);
+
+                const start = (detailPage - 1) * detailPageSize;
+                const visibleLines = tx.entries.slice(start, start + detailPageSize);
+
+                linesBody.innerHTML = visibleLines
+                    .map((line, idx) => lineRowHtml(line, start + idx, isEditing))
+                    .join("");
+
+                renderPager(txLinesPager, detailPage, detailPageSize, totalLineCount, (nextPage) => {
+                    detailPage = nextPage;
+                    renderDetail(selectedIndex);
+                });
             }
 
             const totals = calcTotals(tx.entries);
@@ -834,8 +988,9 @@
         }
 
         function lineRowHtml(line, idx, editable) {
-            const debit = line.drCr === "DR" ? line.amount : 0;
-            const credit = line.drCr === "CR" ? line.amount : 0;
+            const debit = Number(line.debit) || 0;
+            const credit = Number(line.credit) || 0;
+
             const options = accounts.map(a => `
               <option value="${escapeHtml(a.code)}"
                       ${a.code === (line.accountCode || "") ? "selected" : ""}>
@@ -843,32 +998,35 @@
               </option>
             `).join("");
 
-            if (!editable) {
-                return `
+                    if (!editable) {
+                        return `
                     <tr>
                       <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                       <td class="px-4 py-2">
-                        <div class="font-mono text-xs">${escapeHtml(line.accountCode)}</div>
+                        <div class="font-mono text-xs">
+                        <a href="/company/${companyId}/search?q=${encodeURIComponent(line.accountCode || "")}" class="text-indigo-600 hover:underline">
+                            ${escapeHtml(line.accountCode || "")}
+                        </a></div>
                       </td>
                       <td class="px-4 py-2 text-right font-mono text-xs">${debit ? escapeHtml(debit.toFixed(2)) : "&nbsp;"}</td>
-                      <td class="px-4 py-2 text-right font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
+                      <td class="px-4 py-2 text-left font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
                       <td class="px-4 py-2 text-xs text-gray-600 dark:text-neutral-300">${escapeHtml(line.memo || "")}</td>
                       <td class="px-4 py-2 text-right"></td>
                     </tr>
                   `;
-            }
+                    }
 
-            // editable
-            return `
+                    return `
                   <tr data-line-index="${idx}" class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
                     <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                     <td class="px-4 py-2">
                       <select data-field="accountCode"
-                              class="w-full rounded border border-gray-300 dark:border-neutral-700
-                                     bg-white dark:bg-neutral-900 px-2 py-1 text-xs">
-                        <option value="">Select account…</option>
-                        ${options}
-                      </select>
+                                class="w-full rounded border border-gray-300 dark:border-neutral-700
+                                       bg-white dark:bg-neutral-900 px-2 py-1 text-xs">
+                          <option value="">Select account…</option>
+                          <option value="__add_new_account__">+ Add new account...</option>
+                          ${options}
+                        </select>
                     </td>
                     <td class="px-4 py-2 text-right">
                       <input data-field="debit"
@@ -883,7 +1041,7 @@
                              type="number"
                              step="0.01"
                              class="w-24 rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                    px-2 py-1 text-xs text-right font-mono"
+                                    px-2 py-1 text-xs text-left font-mono"
                              value="${credit ? escapeHtml(credit.toString()) : ""}" />
                     </td>
                     <td class="px-4 py-2">
@@ -901,17 +1059,14 @@
                     </td>
                   </tr>
                 `;
-        }
+                }
 
         function calcTotals(entries) {
-            return (entries || []).reduce(
-                (acc, line) => {
-                    if (line.drCr === "DR") acc.dr += line.amount || 0;
-                    else if (line.drCr === "CR") acc.cr += line.amount || 0;
-                    return acc;
-                },
-                { dr: 0, cr: 0 }
-            );
+            return entries.reduce((acc, line) => {
+                acc.dr += Number(line.debit) || 0;
+                acc.cr += Number(line.credit) || 0;
+                return acc;
+            }, { dr: 0, cr: 0 });
         }
 
         // ---------- edit helpers ----------
@@ -935,6 +1090,7 @@
             }
             tx._mode = isNew ? "new" : "edit";
             selectedIndex = index;
+            detailPage = 1;
             renderDetail(index);
         }
 
@@ -987,9 +1143,9 @@
                 description: tx.description,
                 entries: tx.entries.map(line => ({
                     accountCode: line.accountCode,
-                    amount: line.amount,
-                    drCr: line.drCr,
-                    memo: line.memo
+                    debit: Number(line.debit) || 0,
+                    credit: Number(line.credit) || 0,
+                    memo: line.memo || null
                 }))
             };
 
@@ -1070,7 +1226,88 @@
                 const n = Number(t.transactionNo);
                 if (Number.isFinite(n) && n > max) max = n;
             }
-            return max > 0 ? max + 1 : 2001; // or 1, or whatever starting point you like
+            return max > 0 ? max + 1 : 1;
+        }
+
+        function openQuickAccountModal(lineIndex) {
+            pendingAccountLineIndex = lineIndex;
+
+            if (quickAccountCode) quickAccountCode.value = "";
+            if (quickAccountName) quickAccountName.value = "";
+            if (quickAccountType) quickAccountType.value = "";
+
+            quickAccountModal?.classList.remove("hidden");
+            quickAccountModal?.classList.add("flex");
+
+            setTimeout(() => quickAccountCode?.focus(), 0);
+        }
+
+        function closeQuickAccountModal() {
+            quickAccountModal?.classList.add("hidden");
+            quickAccountModal?.classList.remove("flex");
+            pendingAccountLineIndex = null;
+        }
+
+        async function saveQuickAccountFromModal() {
+            const code = (quickAccountCode?.value || "").trim();
+            const name = (quickAccountName?.value || "").trim();
+            const type = (quickAccountType?.value || "").trim();
+
+            if (!code) {
+                showAlert(alertHost, "danger", "Account code is required.");
+                quickAccountCode?.focus();
+                return;
+            }
+
+            if (!name) {
+                showAlert(alertHost, "danger", "Account name is required.");
+                quickAccountName?.focus();
+                return;
+            }
+
+            if (!type) {
+                showAlert(alertHost, "danger", "Account type is required.");
+                quickAccountType?.focus();
+                return;
+            }
+
+            try {
+                const created = await API.createAccount(companyId, {
+                    accountCode: code,
+                    name,
+                    type,
+                    isActive: true
+                });
+
+                const createdCode = created?.accountCode ?? created?.AccountCode ?? code;
+                const createdName = created?.name ?? created?.Name ?? name;
+
+                const exists = accounts.some(a => a.code === createdCode);
+                if (!exists) {
+                    accounts.push({
+                        code: createdCode,
+                        name: createdName
+                    });
+
+                    accounts.sort((a, b) =>
+                        String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: "base" })
+                    );
+                }
+
+                if (selectedIndex != null && pendingAccountLineIndex != null) {
+                    const tx = transactions[selectedIndex];
+                    const line = tx?.entries?.[pendingAccountLineIndex];
+                    if (line) {
+                        line.accountCode = createdCode;
+                    }
+                }
+
+                closeQuickAccountModal();
+                renderDetail(selectedIndex);
+                showAlert(alertHost, "success", `Account ${createdCode} created.`);
+            } catch (err) {
+                showAlert(alertHost, "danger", "Failed to create account: " + err.message);
+            }
         }
 
         // ---------- events ----------
@@ -1086,6 +1323,7 @@
                     _orig: null
                 };
                 transactions.unshift(newTx);
+                detailPage = 1;
                 startEdit(0, true);
             });
         }
@@ -1096,9 +1334,23 @@
             });
         }
 
-        if (searchInput) searchInput.addEventListener("input", debounce(() => { renderMaster(); }, 200));
-        if (fromInput) fromInput.addEventListener("change", () => loadAll());
-        if (toInput) toInput.addEventListener("change", () => loadAll());
+        searchInput?.addEventListener('input', debounce(() => {
+            txPage = 1;
+            selectedIndex = null;
+            loadAll();
+        }, 200));
+
+        fromInput?.addEventListener('change', () => {
+            txPage = 1;
+            selectedIndex = null;
+            loadAll();
+        });
+
+        toInput?.addEventListener('change', () => {
+            txPage = 1;
+            selectedIndex = null;
+            loadAll();
+        });
 
         if (chkSelectAll) {
             chkSelectAll.addEventListener("change", () => {
@@ -1134,6 +1386,7 @@
             }
 
             // default click = select row
+            detailPage = 1;
             renderDetail(index);
         });
 
@@ -1165,13 +1418,20 @@
                 renderMaster();
             });
         }
-
+        if (btnEdit) {
+            btnEdit.addEventListener("click", () => {
+                if (selectedIndex == null) return;
+                startEdit(selectedIndex, false);
+            });
+        }
         if (btnAddLine) {
             btnAddLine.addEventListener("click", () => {
                 if (selectedIndex == null) return;
                 const tx = transactions[selectedIndex];
                 if (!tx) return;
                 tx.entries.push(normalizeEntry({}));
+                const totalDetailPages = Math.max(1, Math.ceil(tx.entries.length / detailPageSize));
+                detailPage = totalDetailPages;
                 renderDetail(selectedIndex);
             });
         }
@@ -1201,8 +1461,15 @@
                 if (!line) return;
 
                 if (field === "accountCode") {
-                    // dropdown change
-                    line.accountCode = e.target.value;
+                    const newValue = e.target.value;
+
+                    if (newValue === "__add_new_account__") {
+                        e.target.value = line.accountCode || "";
+                        openQuickAccountModal(idx);
+                        return;
+                    }
+
+                    line.accountCode = newValue;
                     return;
                 }
 
@@ -1216,18 +1483,9 @@
                     const amount = Number.isFinite(value) ? value : 0;
 
                     if (field === "debit") {
-                        line.drCr = amount > 0 ? "DR" : line.drCr;
-                        line.amount = amount > 0 ? amount : 0;
-
-                        // clear credit input
-                        const creditInput = tr.querySelector('[data-field="credit"]');
-                        if (creditInput && amount > 0) creditInput.value = "";
+                        line.debit = amount;
                     } else {
-                        line.drCr = amount > 0 ? "CR" : line.drCr;
-                        line.amount = amount > 0 ? amount : 0;
-
-                        const debitInput = tr.querySelector('[data-field="debit"]');
-                        if (debitInput && amount > 0) debitInput.value = "";
+                        line.credit = amount;
                     }
                 }
 
@@ -1251,12 +1509,31 @@
                     const tx = transactions[selectedIndex];
                     if (!tx) return;
                     tx.entries.splice(idx, 1);
+                    const totalDetailPages = Math.max(1, Math.ceil(tx.entries.length / detailPageSize));
+                    detailPage = Math.min(detailPage, totalDetailPages);
                     renderDetail(selectedIndex);
                 }
             });
         }
 
+        btnCloseQuickAccountModal?.addEventListener("click", closeQuickAccountModal);
+        btnCancelQuickAccount?.addEventListener("click", closeQuickAccountModal);
+        btnSaveQuickAccount?.addEventListener("click", saveQuickAccountFromModal);
+
+        quickAccountModal?.addEventListener("click", (e) => {
+            if (e.target === quickAccountModal) {
+                closeQuickAccountModal();
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && quickAccountModal && !quickAccountModal.classList.contains("hidden")) {
+                closeQuickAccountModal();
+            }
+        });
+
         (async () => {
+            renderExactTransactionFilter();
             await loadAccounts();
             await loadAll();
         })();
@@ -1308,9 +1585,9 @@
 
             if (!results.length) {
                 tbody.innerHTML = `
-      <tr>
-        <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
-      </tr>`;
+                  <tr>
+                    <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
+                  </tr>`;
                 return;
             }
 
@@ -1320,32 +1597,35 @@
             };
 
             tbody.innerHTML = results.map(r => {
-                const date = escapeHtml((r.date || r.Date || "").toString().slice(0, 10));
-                const txNo = r.transactionNo ?? r.TransactionNo;
-                const txDesc = escapeHtml(r.transactionDescription ?? r.TransactionDescription ?? "");
-                const accCode = escapeHtml(r.accountCode ?? r.AccountCode ?? "");
-                const accName = escapeHtml(r.accountName ?? r.AccountName ?? "");
-                const line = escapeHtml(r.lineDescription ?? r.LineDescription ?? "");
-                const debit = money(r.debit ?? r.Debit);
-                const credit = money(r.credit ?? r.Credit);
+                const txNo = r.transactionNo;
+                const accCodeRaw = r.accountCode ?? "";
+                const accCode = escapeHtml(accCodeRaw);
+                const lineRaw = r.lineDescription ?? "";
+                const txDescRaw = r.transactionDescription ?? "";
+                const description = escapeHtml(txDescRaw || "-");
+                const memo = escapeHtml(lineRaw || "-");
+                const debit = money(r.debit);
+                const credit = money(r.credit);
+                const date = new Date(r.date).toLocaleDateString("en-CA");
 
-                const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCode)}`;
-                const txHref = `/company/${companyId}/search?transactionNo=${encodeURIComponent(String(txNo))}`;
+                const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCodeRaw)}`;
+                const txHref = `/company/${companyId}/transactions?focusTx=${encodeURIComponent(String(txNo))}`;
 
                 return `
                     <tr class="border-b border-zinc-800 hover:bg-zinc-900/60">
-                    <td class="px-4 py-3 text-sm">
-                        <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
-                            href="${accHref}">${accCode} — ${accName}</a>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                        <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
-                            href="${txHref}">${date} • TX #${escapeHtml(String(txNo))}</a>
-                        <div class="text-xs text-zinc-500 mt-1">${txDesc}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm text-zinc-300">${line}</td>
-                    <td class="px-4 py-3 text-sm text-right font-mono">${escapeHtml(debit)}</td>
-                    <td class="px-4 py-3 text-sm text-right font-mono">${escapeHtml(credit)}</td>
+                        <td class="px-4 py-3 text-xs">
+                            <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                               href="${txHref}">${escapeHtml(String(txNo))}</a>
+                        </td>
+                        <td class="px-4 py-3 text-xs">${date}</td>
+                        <td class="px-4 py-3 text-xs">
+                            <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                               href="${accHref}">${accCode}</a>
+                        </td>
+                        <td class="px-4 py-3 text-xs text-zinc-300">${description}</td>
+                        <td class="px-4 py-3 text-xs text-zinc-300">${memo}</td>
+                        <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
+                        <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
                     </tr>`;
                         }).join("");
         }

@@ -69,16 +69,24 @@ namespace GLPack.Services
 
             if (missing.Length > 0)
             {
+                var prefixRules = await _db.AccountTypePrefixes
+                   .AsNoTracking()
+                   .ToListAsync(ct);
+
                 foreach (var code in missing)
                 {
+                    var trimmedCode = code.Trim();
+                    var accountType = ResolveAccountType(trimmedCode, prefixRules);
+
                     _db.Accounts.Add(new Account
                     {
                         CompanyId = companyId,
-                        Code = code.Trim(),
-                        Name = code.Trim(),
-                        Type = "Uncategorized"
+                        Code = trimmedCode,
+                        Name = trimmedCode,
+                        Type = accountType
                     });
                 }
+
 
                 await _db.SaveChangesAsync(ct);
             }
@@ -253,6 +261,20 @@ namespace GLPack.Services
 
             cols.Add(sb.ToString());
             return cols;
+        }
+
+        private static string ResolveAccountType(string accountCode, List<AccountTypePrefix> prefixRules)
+        {
+            if (string.IsNullOrWhiteSpace(accountCode))
+                return "Uncategorized";
+
+            var code = accountCode.Trim().ToUpperInvariant();
+
+            var match = prefixRules
+                .OrderByDescending(x => x.Prefix.Length)
+                .FirstOrDefault(x => code.StartsWith(x.Prefix.ToUpperInvariant()));
+
+            return match?.AccountType ?? "Uncategorized";
         }
     }
 }
