@@ -85,43 +85,49 @@
                                     if (row.RowType == "Spacer")
                                     {
                                         <tr>
-                                            <td colspan="4" class="px-3 py-2 bg-transparent"></td>
+                                            <td colspan="4" class="px-4 py-1 bg-transparent"></td>
                                         </tr>
                                     }
                                     else if (row.RowType == "Header")
                                     {
                                         <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
-                                            <td class="px-3 py-2"></td>
-                                            <td class="px-3 py-2">@row.Description</td>
-                                            <td class="px-3 py-2 text-right"></td>
-                                            <td class="px-3 py-2 text-right"></td>
+                                            <td class="px-4 py-2"></td>
+                                            <td class="px-4 py-2">@row.Description</td>
+                                            <td class="px-4 py-2 text-right"></td>
+                                            <td class="px-4 py-2 text-right"></td>
                                         </tr>
                                     }
                                     else if (row.RowType == "Subtotal")
                                     {
                                         <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
-                                            <td class="px-3 py-2"></td>
-                                            <td class="px-3 py-2">@row.Description</td>
-                                            <td class="px-3 py-2 text-right"></td>
-                                            <td class="px-3 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
+                                            <td class="px-4 py-2"></td>
+                                            <td class="px-2 py-2">@row.Description</td>
+                                            <td class="px-4 py-2 text-right"></td>
+                                            <td class="px-4 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
                                         </tr>
                                     }
                                     else if (row.RowType == "Calculated")
                                     {
                                         <tr class="bg-gray-100 dark:bg-neutral-800 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
-                                            <td class="px-3 py-2"></td>
-                                            <td class="px-3 py-2">@row.Description</td>
-                                            <td class="px-3 py-2 text-right"></td>
-                                            <td class="px-3 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
+                                            <td class="px-4 py-2"></td>
+                                            <td class="px-2 py-2">@row.Description</td>
+                                            <td class="px-4 py-2 text-right"></td>
+                                            <td class="px-4 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
                                         </tr>
                                     }
                                     else
                                     {
                                         <tr>
-                                            <td class="px-3 py-2">@row.Code</td>
-                                            <td class="px-3 py-2">@row.Description</td>
-                                            <td class="px-3 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
-                                            <td class="px-3 py-2 text-right"></td>
+                                            <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">
+                                                @row.Code
+                                            </td>
+                                            <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">
+                                                @row.Description
+                                            </td>
+                                            <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                                @((row.Amount ?? 0m).ToString("N2"))
+                                            </td>
+                                            <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100"></td>
                                         </tr>
                                     }
                                 }
