@@ -1597,14 +1597,16 @@
             };
 
             tbody.innerHTML = results.map(r => {
-                const txNo = r.transactionNo ?? r.TransactionNo;
-                const accCodeRaw = r.accountCode ?? r.AccountCode ?? "";
+                const txNo = r.transactionNo;
+                const accCodeRaw = r.accountCode ?? "";
                 const accCode = escapeHtml(accCodeRaw);
-                const lineRaw = r.lineDescription ?? r.LineDescription ?? "";
-                const txDescRaw = r.transactionDescription ?? r.TransactionDescription ?? "";
-                const description = escapeHtml(lineRaw || txDescRaw || "-");
-                const debit = money(r.debit ?? r.Debit);
-                const credit = money(r.credit ?? r.Credit);
+                const lineRaw = r.lineDescription ?? "";
+                const txDescRaw = r.transactionDescription ?? "";
+                const description = escapeHtml(txDescRaw || "-");
+                const memo = escapeHtml(lineRaw || "-");
+                const debit = money(r.debit);
+                const credit = money(r.credit);
+                const date = new Date(r.date).toLocaleDateString("en-CA");
 
                 const accHref = `/company/${companyId}/search?accountCode=${encodeURIComponent(accCodeRaw)}`;
                 const txHref = `/company/${companyId}/transactions?focusTx=${encodeURIComponent(String(txNo))}`;
@@ -1615,11 +1617,13 @@
                             <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
                                href="${txHref}">${escapeHtml(String(txNo))}</a>
                         </td>
+                        <td class="px-4 py-3 text-xs">${date}</td>
                         <td class="px-4 py-3 text-xs">
                             <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
                                href="${accHref}">${accCode}</a>
                         </td>
                         <td class="px-4 py-3 text-xs text-zinc-300">${description}</td>
+                        <td class="px-4 py-3 text-xs text-zinc-300">${memo}</td>
                         <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
                         <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
                     </tr>`;

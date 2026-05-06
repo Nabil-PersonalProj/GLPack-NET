@@ -71,8 +71,8 @@
                     else
                     {
                         <table class="min-w-full text-xs">
-                            <thead class="bg-gray-50 dark:bg-neutral-900/60 text-gray-600 dark:text-neutral-300">
-                                <tr>
+                            <thead class="border-b border-gray-200 dark:border-neutral-800">
+                                <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-neutral-400">
                                     <th class="px-3 py-2 text-left">Code</th>
                                     <th class="px-3 py-2 text-left">Description</th>
                                     <th class="px-3 py-2 text-right">Amount</th>
@@ -231,48 +231,65 @@
                 else
                 {
                     <table class="min-w-full text-xs">
-                        <thead class="bg-gray-50 dark:bg-neutral-900/60 text-gray-600 dark:text-neutral-300">
-                            <tr>
-                                <th class="px-3 py-2 text-left">Code</th>
-                                <th class="px-3 py-2 text-left">Description</th>
-                                <th class="px-3 py-2 text-right">Amount</th>
+                        <thead class="border-b border-gray-200 dark:border-neutral-800">
+                            <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                                <th class="px-4 py-2 text-left">Code</th>
+                                <th class="px-2 py-2 text-left">Description</th>
+                                <th class="px-4 py-2 text-right">Amount</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-neutral-800">
                             <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">SHARE CAPITAL</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.ShareCapitalTotal.ToString("N2")</td>
+                                <td class="px-2 py-2">SHARE CAPITAL</td>
+                                <td class="px-3 py-2 text-right"></td>
                             </tr>
-                            <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
+
+                            @foreach (var row in Model.BalanceSheet.ShareCapitalLine)
+                            {
+                                <tr>
+                                    <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
+                                    <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
+                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@row.Amount.ToString("N2")</td>
+                                </tr>
+                            }
+
+                            <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
+                                <td class="px-4 py-2"></td>
+                                <td class="px-2 py-2">TOTAL SHARE CAPITAL</td>
+                                <td class="px-4 py-2 text-right">@Model.BalanceSheet.ShareCapitalTotal.ToString("N2")</td>
+                            </tr>
+
+                            <tr>
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">PROFIT AND LOSS ACCOUNT</td>
+                                <td class="px-2 py-2">PROFIT AND LOSS ACCOUNT</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.ProfitAndLossTotal.ToString("N2")</td>
                             </tr>
+
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">TOTAL EQUITY</td>
+                                <td class="px-2 py-2">TOTAL EQUITY</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.EquityTotal.ToString("N2")</td>
                             </tr>
 
                             <tr>
-                                <td colspan="3" class="px-3 py-3 font-semibold text-gray-700 dark:text-neutral-200">
+                                <td colspan="3" class="px-3 py-2 font-semibold text-gray-700 dark:text-neutral-200">
                                     Represented by
                                 </td>
                             </tr>
 
                             <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">FIXED ASSETS</td>
+                                <td class="px-2 py-2">FIXED ASSETS</td>
                                 <td class="px-3 py-2 text-right"></td>
                             </tr>
 
                             @foreach (var row in Model.BalanceSheet.FixedAssetLines)
                             {
                                 <tr>
-                                    <td class="px-3 py-2">@row.AccountCode</td>
-                                    <td class="px-3 py-2">@row.AccountName</td>
-                                    <td class="px-3 py-2 text-right">
+                                    <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
+                                    <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
+                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
                                         @if (row.AccountCode.StartsWith("PD", StringComparison.OrdinalIgnoreCase))
                                         {
                                             @($"({row.Amount.ToString("N2")})")
@@ -287,61 +304,73 @@
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">NET FIXED ASSETS</td>
+                                <td class="px-2 py-2">NET FIXED ASSETS</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.NetFixedAssets.ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">CURRENT ASSETS</td>
+                                <td class="px-2 py-2">CURRENT ASSETS</td>
                                 <td class="px-3 py-2 text-right"></td>
+                            </tr>
+
+                            <tr>
+                                <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300"></td>
+                                <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">TRADE DEBTORS</td>
+                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@Model.BalanceSheet.TotalDebtors.ToString("N2")</td>
                             </tr>
 
                             @foreach (var row in Model.BalanceSheet.CurrentAssetLines)
                             {
                                 <tr>
-                                    <td class="px-3 py-2">@row.AccountCode</td>
-                                    <td class="px-3 py-2">@row.AccountName</td>
-                                    <td class="px-3 py-2 text-right">@row.Amount.ToString("N2")</td>
+                                    <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
+                                    <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
+                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@row.Amount.ToString("N2")</td>
                                 </tr>
                             }
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">TOTAL CURRENT ASSETS</td>
+                                <td class="px-2 py-2">TOTAL CURRENT ASSETS</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.CurrentAssetsTotal.ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">LESS CURRENT LIABILITIES</td>
+                                <td class="px-2 py-2">LESS CURRENT LIABILITIES</td>
                                 <td class="px-3 py-2 text-right"></td>
+                            </tr>
+
+                            <tr>
+                                <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300"></td>
+                                <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">TRADE CREDITORS</td>
+                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@Model.BalanceSheet.TotalCreditors.ToString("N2")</td>
                             </tr>
 
                             @foreach (var row in Model.BalanceSheet.CurrentLiabilityLines)
                             {
                                 <tr>
-                                    <td class="px-3 py-2">@row.AccountCode</td>
-                                    <td class="px-3 py-2">@row.AccountName</td>
-                                    <td class="px-3 py-2 text-right">@row.Amount.ToString("N2")</td>
+                                    <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
+                                    <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
+                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@row.Amount.ToString("N2")</td>
                                 </tr>
                             }
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">TOTAL CURRENT LIABILITIES</td>
+                                <td class="px-2 py-2">TOTAL CURRENT LIABILITIES</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.CurrentLiabilitiesTotal.ToString("N2")</td>
                             </tr>
 
-                            <tr class="bg-gray-100 dark:bg-neutral-800 font-bold">
+                            <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">NET CURRENT ASSETS / (LIABILITIES)</td>
+                                <td class="px-2 py-2">NET CURRENT ASSETS / (LIABILITIES)</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.NetCurrentAssets.ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2">TOTAL ASSETS LESS LIABILITIES</td>
+                                <td class="px-2 py-2">TOTAL ASSETS LESS LIABILITIES</td>
                                 <td class="px-3 py-2 text-right">@Model.BalanceSheet.TotalAssetsLessLiabilities.ToString("N2")</td>
                             </tr>
                         </tbody>

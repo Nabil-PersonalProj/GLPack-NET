@@ -48,6 +48,7 @@
     public sealed class BalanceSheetVm
     {
         public decimal ShareCapitalTotal { get; set; }
+        public List<BalanceSheetLineVm> ShareCapitalLine { get; set; } = new();
         public decimal ProfitAndLossTotal { get; set; }
         public decimal EquityTotal { get; set; }
 
@@ -57,9 +58,11 @@
         public decimal NetFixedAssets { get; set; }
 
         public List<BalanceSheetLineVm> CurrentAssetLines { get; set; } = new();
+        public decimal TotalDebtors { get; set; }
         public decimal CurrentAssetsTotal { get; set; }
 
         public List<BalanceSheetLineVm> CurrentLiabilityLines { get; set; } = new();
+        public decimal TotalCreditors { get; set; }
         public decimal CurrentLiabilitiesTotal { get; set; }
 
         public decimal NetCurrentAssets { get; set; }

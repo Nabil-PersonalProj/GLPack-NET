@@ -73,7 +73,6 @@ namespace GLPack.Services
                 .FirstOrDefaultAsync(x => x.Id == id, ct);
             if (c is null) return;
 
-            // Choose policy: restrict if data exists (safer), or cascade (auto-remove children).
             if (c.Accounts.Any() || c.Transactions.Any())
             {
                 await _appLogger.LogAsync(

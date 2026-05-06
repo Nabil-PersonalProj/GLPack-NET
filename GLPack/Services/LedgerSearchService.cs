@@ -64,8 +64,8 @@ namespace GLPack.Services
 
             // Sort newest first
             query = query
-                .OrderByDescending(x => x.t.Date)
-                .ThenByDescending(x => x.t.TransactionNo)
+                .OrderBy(x => x.t.Date)
+                .ThenBy(x => x.t.TransactionNo)
                 .ThenBy(x => x.a.Code);
 
             // Page + shape DTO

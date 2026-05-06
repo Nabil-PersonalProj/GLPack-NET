@@ -231,6 +231,13 @@ namespace GLPack.Services
                 // SC accounts, account type: equity
                 if (type.Equals("Equity", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "SC"))
                 {
+                    vm.ShareCapitalLine.Add(new BalanceSheetLineVm
+                    {
+                        AccountCode = code,
+                        AccountName = name,
+                        AccountType = type,
+                        Amount = amount
+                    });
                     vm.ShareCapitalTotal += amount;
                     continue;
                 }
@@ -281,6 +288,13 @@ namespace GLPack.Services
                     vm.CurrentAssetsTotal += amount;
                     continue;
                 }
+                // Get TD accounts
+                if (type.Equals("Debtors", StringComparison.OrdinalIgnoreCase) || type.Equals("Debtor", StringComparison.OrdinalIgnoreCase))
+                {
+                    vm.TotalDebtors += amount;
+                    vm.CurrentAssetsTotal += amount;
+                    continue;
+                }
                 // CURRENT LIABILITIES = all other liabilities except PD
                 if (type.Equals("Liabilities", StringComparison.OrdinalIgnoreCase))
                 {
@@ -295,10 +309,17 @@ namespace GLPack.Services
                     vm.CurrentLiabilitiesTotal += amount;
                     continue;
                 }
+                // Get TC accounts
+                if (type.Equals("Creditors", StringComparison.OrdinalIgnoreCase) || type.Equals("Creditor", StringComparison.OrdinalIgnoreCase))
+                {
+                    vm.TotalCreditors += amount;
+                    vm.CurrentLiabilitiesTotal += amount;
+                    continue;
+                }
             }
             // calculated totals
             vm.EquityTotal = vm.ShareCapitalTotal + vm.ProfitAndLossTotal;
-            vm.NetFixedAssets = vm.FixedAssetsFaTotal - vm.FixedAssetsPdTotal;
+            vm.NetFixedAssets = vm.FixedAssetsFaTotal + vm.FixedAssetsPdTotal;
             vm.NetCurrentAssets = vm.CurrentAssetsTotal + vm.CurrentLiabilitiesTotal;
             vm.TotalAssetsLessLiabilities = vm.NetFixedAssets + vm.NetCurrentAssets;
 
