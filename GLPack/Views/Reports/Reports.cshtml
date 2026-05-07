@@ -92,7 +92,7 @@
                                     {
                                         <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
                                             <td class="px-4 py-2"></td>
-                                            <td class="px-4 py-2">@row.Description</td>
+                                            <td class="px-2 py-2">@row.Description</td>
                                             <td class="px-4 py-2 text-right"></td>
                                             <td class="px-4 py-2 text-right"></td>
                                         </tr>
@@ -103,7 +103,8 @@
                                             <td class="px-4 py-2"></td>
                                             <td class="px-2 py-2">@row.Description</td>
                                             <td class="px-4 py-2 text-right"></td>
-                                            <td class="px-4 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
+                                            <td class="px-4 py-2 text-right @(row.Amount < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                                @(Math.Abs((row.Amount ?? 0m)).ToString("N2"))</td>
                                         </tr>
                                     }
                                     else if (row.RowType == "Calculated")
@@ -112,7 +113,8 @@
                                             <td class="px-4 py-2"></td>
                                             <td class="px-2 py-2">@row.Description</td>
                                             <td class="px-4 py-2 text-right"></td>
-                                            <td class="px-4 py-2 text-right">@((row.Amount ?? 0m).ToString("N2"))</td>
+                                            <td class="px-4 py-2 text-right @(row.Amount < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                                @(Math.Abs((row.Amount ?? 0m)).ToString("N2"))</td>
                                         </tr>
                                     }
                                     else
@@ -124,8 +126,8 @@
                                             <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">
                                                 @row.Description
                                             </td>
-                                            <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
-                                                @((row.Amount ?? 0m).ToString("N2"))
+                                            <td class="px-4 py-1 text-right @(row.Amount < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                                @(Math.Abs((row.Amount ?? 0m)).ToString("N2"))
                                             </td>
                                             <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100"></td>
                                         </tr>
@@ -256,7 +258,9 @@
                                 <tr>
                                     <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
                                     <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
-                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@row.Amount.ToString("N2")</td>
+                                    <td class="px-4 py-1 text-right @(row.Amount < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                        @Math.Abs(row.Amount).ToString("N2")
+                                    </td>
                                 </tr>
                             }
 
@@ -269,13 +273,15 @@
                             <tr>
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">PROFIT AND LOSS ACCOUNT</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.ProfitAndLossTotal.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.ProfitAndLossTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.ProfitAndLossTotal).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL EQUITY</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.EquityTotal.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.EquityTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.EquityTotal).ToString("N2")</td>
                             </tr>
 
                             <tr>
@@ -311,7 +317,8 @@
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">NET FIXED ASSETS</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.NetFixedAssets.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.NetFixedAssets < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.NetFixedAssets).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
@@ -323,7 +330,8 @@
                             <tr>
                                 <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300"></td>
                                 <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">TRADE DEBTORS</td>
-                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@Model.BalanceSheet.TotalDebtors.ToString("N2")</td>
+                                <td class="px-4 py-1 text-right @(Model.BalanceSheet.TotalDebtors < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.TotalDebtors).ToString("N2")</td>
                             </tr>
 
                             @foreach (var row in Model.BalanceSheet.CurrentAssetLines)
@@ -331,14 +339,16 @@
                                 <tr>
                                     <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
                                     <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
-                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@row.Amount.ToString("N2")</td>
+                                    <td class="px-4 py-1 text-right @(row.Amount < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                        @Math.Abs(row.Amount).ToString("N2")</td>
                                 </tr>
                             }
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL CURRENT ASSETS</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.CurrentAssetsTotal.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.CurrentAssetsTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.CurrentAssetsTotal).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-100 dark:bg-neutral-800 font-semibold">
@@ -350,7 +360,8 @@
                             <tr>
                                 <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300"></td>
                                 <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">TRADE CREDITORS</td>
-                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@Model.BalanceSheet.TotalCreditors.ToString("N2")</td>
+                                <td class="px-4 py-1 text-right @(Model.BalanceSheet.TotalCreditors < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.TotalCreditors).ToString("N2")</td>
                             </tr>
 
                             @foreach (var row in Model.BalanceSheet.CurrentLiabilityLines)
@@ -358,26 +369,30 @@
                                 <tr>
                                     <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">@row.AccountCode</td>
                                     <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">@row.AccountName</td>
-                                    <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">@row.Amount.ToString("N2")</td>
+                                    <td class="px-4 py-1 text-right @(row.Amount < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                        @Math.Abs(row.Amount).ToString("N2")</td>
                                 </tr>
                             }
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL CURRENT LIABILITIES</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.CurrentLiabilitiesTotal.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.CurrentLiabilitiesTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.CurrentLiabilitiesTotal).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">NET CURRENT ASSETS / (LIABILITIES)</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.NetCurrentAssets.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.NetCurrentAssets < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.NetCurrentAssets).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL ASSETS LESS LIABILITIES</td>
-                                <td class="px-3 py-2 text-right">@Model.BalanceSheet.TotalAssetsLessLiabilities.ToString("N2")</td>
+                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.TotalAssetsLessLiabilities < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.TotalAssetsLessLiabilities).ToString("N2")</td>
                             </tr>
                         </tbody>
                     </table>
