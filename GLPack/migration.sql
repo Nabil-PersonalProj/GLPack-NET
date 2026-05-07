@@ -140,3 +140,15 @@ VALUES ('20260226155718_AllowZeroZeroTransactionItem', '10.0.2');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE account_type_prefix (
+    "Prefix" character varying(10) NOT NULL,
+    "AccountType" character varying(50) NOT NULL,
+    CONSTRAINT "PK_account_type_prefix" PRIMARY KEY ("Prefix")
+);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260331060117_AddAccountTypePrefix', '10.0.2');
+
+COMMIT;
+

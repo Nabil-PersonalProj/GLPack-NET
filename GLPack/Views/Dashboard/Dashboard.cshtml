@@ -10,7 +10,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-semibold tracking-tight">@Model.CompanyName</h1>
-            <p class="text-sm text-gray-500 dark:text-neutral-400">
+            <p class="text-xs text-gray-500 dark:text-neutral-400">
                 Company ID: @Model.CompanyId
             </p>
         </div>
@@ -19,14 +19,14 @@
             <button type="button"
                     id="openImportModal"
                     class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-700
-                           px-3 py-1.5 text-sm text-gray-700 dark:text-neutral-100
+                           px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
                            hover:bg-gray-50 dark:hover:bg-neutral-800">
                 <span>Import CSV</span>
             </button>
 
             <a asp-controller="Home" asp-action="Index"
                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-700
-                      px-3 py-1.5 text-sm text-gray-700 dark:text-neutral-100
+                      px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
                       hover:bg-gray-50 dark:hover:bg-neutral-800">
                 <span>← All Companies</span>
             </a>
@@ -34,13 +34,13 @@
     </div>
     @if (TempData["ImportSuccess"] is string ok && !string.IsNullOrWhiteSpace(ok))
     {
-        <div class="rounded-xl border border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-900/10 p-3 text-sm text-green-800 dark:text-green-200">
+        <div class="rounded-xl border border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-900/10 p-3 text-xs text-green-800 dark:text-green-200">
             @ok
         </div>
     }
     @if (TempData["ImportError"] is string err && !string.IsNullOrWhiteSpace(err))
     {
-        <div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-sm text-red-800 dark:text-red-200">
+        <div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-xs text-red-800 dark:text-red-200">
             Import failed: @err
         </div>
     }
@@ -49,7 +49,7 @@
     <div class="grid gap-4 lg:grid-cols-2">
         <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4">
             <div class="flex items-center justify-between mb-2">
-                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                <h2 class="text-xs font-semibold text-gray-800 dark:text-neutral-100">
                     Accounts
                 </h2>
                 <a href="/company/@Model.CompanyId/accounts"
@@ -57,14 +57,14 @@
                     View all
                 </a>
             </div>
-            <div id="accountsPreview" class="text-sm text-gray-500 dark:text-neutral-400">
+            <div id="accountsPreview" class="text-xs text-gray-500 dark:text-neutral-400">
                 No data loaded yet.
             </div>
         </div>
 
         <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4">
             <div class="flex items-center justify-between mb-2">
-                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                <h2 class="text-xs font-semibold text-gray-800 dark:text-neutral-100">
                     Transactions
                 </h2>
                 <a href="/company/@Model.CompanyId/transactions"
@@ -72,7 +72,7 @@
                     View all
                 </a>
             </div>
-            <div id="transactionsPreview" class="text-sm text-gray-500 dark:text-neutral-400">
+            <div id="transactionsPreview" class="text-xs text-gray-500 dark:text-neutral-400">
                 No data loaded yet.
             </div>
         </div>
@@ -80,7 +80,7 @@
         <!-- Reports card -->
         <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4 lg:col-span-2">
             <div class="flex items-center justify-between mb-2">
-                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                <h2 class="text-xs font-semibold text-gray-800 dark:text-neutral-100">
                     Reports
                 </h2>
                 <a href="/company/@Model.CompanyId/reports"
@@ -88,7 +88,7 @@
                     Open reports
                 </a>
             </div>
-            <p class="text-sm text-gray-500 dark:text-neutral-400">
+            <p class="text-xs text-gray-500 dark:text-neutral-400">
                 View and download Profit &amp; Loss and Trial Balance.
             </p>
         </div>
@@ -98,12 +98,9 @@
     <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 p-4 lg:col-span-2">
         <div class="flex items-center justify-between mb-2">
             <div>
-                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                <h2 class="text-xs font-semibold text-gray-800 dark:text-neutral-100">
                     Trial Balance
                 </h2>
-                <p class="text-xs text-gray-500 dark:text-neutral-400">
-                    Debits and credits by account (all periods).
-                </p>
             </div>
 
             <a href="/company/@Model.CompanyId/reports"
@@ -115,12 +112,12 @@
         <div class="overflow-x-auto -mx-4 -mb-4">
             <table class="min-w-full text-xs">
                 <thead class="border-b border-gray-200 dark:border-neutral-800">
-                    <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                    <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">
                         <th class="px-4 py-2 text-left">Code</th>
                         <th class="px-2 py-2 text-left">Name</th>
                         <th class="px-2 py-2 text-left">Type</th>
                         <th class="px-4 py-2 text-right">Debit</th>
-                        <th class="px-4 py-2 text-right">Credit</th>
+                        <th class="px-4 py-2 text-left">Credit</th>
                     </tr>
                 </thead>
 
@@ -128,7 +125,7 @@
                     @if (Model.TrialBalanceRows.Count == 0)
                     {
                         <tr>
-                            <td colspan="5" class="px-4 py-4 text-sm text-gray-500 dark:text-neutral-400">
+                            <td colspan="5" class="px-4 py-4 text-xs text-gray-500 dark:text-neutral-400">
                                 No trial balance data yet.
                             </td>
                         </tr>
@@ -137,30 +134,26 @@
                     {
                         @foreach (var row in Model.TrialBalanceRows)
                         {
-                            <tr>
-                                <td class="px-4 py-1 font-mono text-[11px] text-gray-600 dark:text-neutral-300">
+                            <tr data-dashboard-tb-row="1">
+                                <td class="px-4 py-1 font-mono text-xs text-gray-600 dark:text-neutral-300">
                                     <a class="hover:underline text-indigo-600 dark:text-indigo-400"
                                        href="/company/@Model.CompanyId/search?accountCode=@row.AccountCode">
-                                        @row.AccountCode
+                                    @row.AccountCode
                                     </a>
                                 </td>
-
-                                <td class="px-2 py-1 text-gray-800 dark:text-neutral-100">
+                                <td class="px-2 py-1 text-xs text-gray-800 dark:text-neutral-100">
                                     <a class="hover:underline text-indigo-600 dark:text-indigo-400"
                                        href="/company/@Model.CompanyId/search?accountCode=@row.AccountCode">
-                                        @row.AccountName
+                                    @row.AccountName
                                     </a>
                                 </td>
-
-                                <td class="px-2 py-1 text-gray-500 dark:text-neutral-400">
+                                <td class="px-2 py-1 text-xs text-gray-500 dark:text-neutral-400">
                                     @row.AccountType
                                 </td>
-
-                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                <td class="px-4 py-1 text-xs text-right text-gray-800 dark:text-neutral-100">
                                     @row.Debit.ToString("N2")
                                 </td>
-
-                                <td class="px-4 py-1 text-right text-gray-800 dark:text-neutral-100">
+                                <td class="px-4 py-1 text-xs text-left text-gray-800 dark:text-neutral-100">
                                     @row.Credit.ToString("N2")
                                 </td>
                             </tr>
@@ -168,12 +161,18 @@
 
                         <tr class="bg-gray-50 dark:bg-neutral-900/60 font-semibold">
                             <td class="px-4 py-2" colspan="3">Totals</td>
-                            <td class="px-4 py-2 text-right">@Model.TrialBalanceTotalDebit.ToString("N2")</td>
-                            <td class="px-4 py-2 text-right">@Model.TrialBalanceTotalCredit.ToString("N2")</td>
+                            <td class="px-4 py-2 text-xs text-right">@Model.TrialBalanceTotalDebit.ToString("N2")</td>
+                            <td class="px-4 py-2 text-xs text-left">@Model.TrialBalanceTotalCredit.ToString("N2")</td>
                         </tr>
                     }
                 </tbody>
             </table>
+            @if (Model.TrialBalanceRows.Count > 0)
+            {
+                <div id="dashboardTbPager"
+                     class="mt-3 flex items-center justify-between rounded-2xl dark:border-neutral-800 bg-transparent dark:bg-transparent px-4 py-3 text-xs">
+                </div>
+            }
         </div>
     </div>
 </section>
@@ -184,7 +183,7 @@
     <div class="relative mx-auto mt-24 w-[92%] max-w-lg rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-4 shadow-xl">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">Import CSV</h3>
+                <h3 class="text-xs font-semibold text-gray-800 dark:text-neutral-100">Import CSV</h3>
                 <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
                     Columns must be: DATE, TRXNO, LEDGERNAME, PARTICULAR, DRAMOUNT, CRAMOUNT (in this order).
                 </p>
@@ -195,18 +194,18 @@
         <form class="mt-4 space-y-3" method="post" enctype="multipart/form-data" action="/company/@Model.CompanyId/import">
             @Html.AntiForgeryToken()
             <input type="file" name="csvFile" accept=".csv,text/csv" required
-                   class="block w-full text-sm text-gray-700 dark:text-neutral-100
+                   class="block w-full text-xs text-gray-700 dark:text-neutral-100
                           file:mr-3 file:rounded-lg file:border-0
                           file:bg-gray-100 dark:file:bg-neutral-800 file:px-3 file:py-2
-                          file:text-sm file:font-medium file:text-gray-800 dark:file:text-neutral-100" />
+                          file:text-xs file:font-medium file:text-gray-800 dark:file:text-neutral-100" />
 
             <div class="flex items-center justify-end gap-2">
                 <button type="button" id="cancelImport"
-                        class="rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 text-sm text-gray-700 dark:text-neutral-100 hover:bg-gray-50 dark:hover:bg-neutral-900">
+                        class="rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100 hover:bg-gray-50 dark:hover:bg-neutral-900">
                     Cancel
                 </button>
                 <button type="submit"
-                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500">
+                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500">
                     Import
                 </button>
             </div>
@@ -233,5 +232,68 @@
         openBtn?.addEventListener('click', openModal);
         closeBtn?.addEventListener('click', closeModal);
         cancelBtn?.addEventListener('click', closeModal);
+        (function () {
+            const rows = Array.from(document.querySelectorAll('[data-dashboard-tb-row="1"]'));
+            const host = document.querySelector('#dashboardTbPager');
+            const pageSize = 10;
+
+            if (!host) return;
+
+            if (!rows.length) {
+                host.innerHTML = "";
+                return;
+            }
+
+            let page = 1;
+
+            function render() {
+                const totalCount = rows.length;
+                const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+                page = Math.min(Math.max(1, page), totalPages);
+
+                const start = (page - 1) * pageSize;
+                const end = start + pageSize;
+
+                rows.forEach((row, idx) => {
+                    row.classList.toggle('hidden', !(idx >= start && idx < end));
+                });
+
+                host.innerHTML = `
+                    <div class="text-xs text-gray-500 dark:text-neutral-400">
+                        Page ${page} of ${totalPages} · ${totalCount} row(s)
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button"
+                                data-page="prev"
+                                class="rounded border border-gray-300 dark:border-neutral-700 px-3 py-1 text-xs ${page <= 1 ? 'opacity-40 cursor-not-allowed' : ''}"
+                                ${page <= 1 ? 'disabled' : ''}>
+                            Previous
+                        </button>
+                        <button type="button"
+                                data-page="next"
+                                class="rounded border border-gray-300 dark:border-neutral-700 px-3 py-1 text-xs ${page >= totalPages ? 'opacity-40 cursor-not-allowed' : ''}"
+                                ${page >= totalPages ? 'disabled' : ''}>
+                            Next
+                        </button>
+                    </div>
+                `;
+
+                host.querySelector('[data-page="prev"]')?.addEventListener('click', () => {
+                    if (page > 1) {
+                        page--;
+                        render();
+                    }
+                });
+
+                host.querySelector('[data-page="next"]')?.addEventListener('click', () => {
+                    if (page < totalPages) {
+                        page++;
+                        render();
+                    }
+                });
+            }
+
+            render();
+        })();
     </script>
 }

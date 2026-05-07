@@ -1,8 +1,8 @@
-﻿using System.Globalization;
-using System.Text;
-using GLPack.DAL;
+﻿using GLPack.DAL;
 using GLPack.ViewModels.Reports;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
 
 namespace GLPack.Services
 {
@@ -30,8 +30,16 @@ namespace GLPack.Services
                     AccountCode = g.Key.AccountCode,
                     AccountName = g.Key.Name,
                     AccountType = g.Key.Type,
-                    Debit = g.Sum(x => x.Debit),
-                    Credit = g.Sum(x => x.Credit)
+                    TotalDebit = g.Sum(x => x.Debit),
+                    TotalCredit = g.Sum(x => x.Credit)
+                })
+                .Select(x => new TrialBalanceRow
+                {
+                    AccountCode = x.AccountCode,
+                    AccountName = x.AccountName,
+                    AccountType = x.AccountType,
+                    Debit = x.TotalDebit > x.TotalCredit ? x.TotalDebit - x.TotalCredit : 0m,
+                    Credit = x.TotalCredit > x.TotalDebit ? x.TotalCredit - x.TotalDebit : 0m
                 })
                 .OrderBy(r => r.AccountCode)
                 .ToListAsync(ct);
@@ -153,8 +161,6 @@ namespace GLPack.Services
                 }
             }
 
-            var sections = new List<ProfitLossSection>();
-
             var grossProfit = salesTotal - costOfSalesTotal;
             var finalProfit = grossProfit - expensesTotal;
             var carriedForward = finalProfit + balanceBroughtDown;
@@ -182,6 +188,154 @@ namespace GLPack.Services
             rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "P&L Carried Forward", Amount = carriedForward });
 
             return rows;
+        }
+
+        public async Task<BalanceSheetVm> GetBalanceSheetAsync(int companyId, CancellationToken ct)
+        {
+            var entries = await _db.TransactionEntries
+                .Where(e => e.CompanyId == companyId)
+                .Select(e => new
+                {
+                    e.AccountCode,
+                    AccountName = e.Account.Name,
+                    AccountType = e.Account.Type,
+                    e.Debit,
+                    e.Credit
+                })
+                .ToListAsync(ct);
+
+            var grouped = entries
+                .GroupBy(e => new { e.AccountCode, e.AccountName, e.AccountType })
+                .Select(g => new
+                {
+                    g.Key.AccountCode,
+                    g.Key.AccountName,
+                    g.Key.AccountType,
+                    TotalDebit = g.Sum(x => x.Debit),
+                    TotalCredit = g.Sum(x => x.Credit)
+                })
+                .ToList();
+
+            var vm = new BalanceSheetVm();
+
+            foreach (var a in grouped)
+            {
+                var code = (a.AccountCode ?? "").Trim();
+                var name = (a.AccountName ?? "").Trim();
+                var type = (a.AccountType ?? "").Trim();
+                var amount = GetNetBalance(a.TotalDebit, a.TotalCredit);
+
+                if (amount == 0m)
+                    continue;
+
+                // SC accounts, account type: equity
+                if (type.Equals("Equity", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "SC"))
+                {
+                    vm.ShareCapitalLine.Add(new BalanceSheetLineVm
+                    {
+                        AccountCode = code,
+                        AccountName = name,
+                        AccountType = type,
+                        Amount = amount
+                    });
+                    vm.ShareCapitalTotal += amount;
+                    continue;
+                }
+                // profitNLoss account
+                if (type.Equals("Profit & Loss", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "PL"))
+                {
+                    vm.ProfitAndLossTotal += amount;
+                    continue;
+                }
+                // Fixed Assets FA And Accumulated Depreciation PD
+                if (type.Equals("Asset", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "FA"))
+                {
+                    vm.FixedAssetLines.Add(new BalanceSheetLineVm
+                    {
+                        AccountCode = code,
+                        AccountName = name,
+                        AccountType = type,
+                        Amount = amount
+                    });
+
+                    vm.FixedAssetsFaTotal += amount;
+                    continue;
+                }
+                if (type.Equals("Liabilities", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "PD"))
+                {
+                    vm.FixedAssetLines.Add(new BalanceSheetLineVm
+                    {
+                        AccountCode = code,
+                        AccountName = name,
+                        AccountType = type,
+                        Amount = amount
+                    });
+
+                    vm.FixedAssetsPdTotal += amount;
+                    continue;
+                }
+                // Current Assets (FA accounts not included)
+                if (type.Equals("Asset", StringComparison.OrdinalIgnoreCase))
+                {
+                    vm.CurrentAssetLines.Add(new BalanceSheetLineVm
+                    {
+                        AccountCode = code,
+                        AccountName = name,
+                        AccountType = type,
+                        Amount = amount
+                    });
+
+                    vm.CurrentAssetsTotal += amount;
+                    continue;
+                }
+                // Get TD accounts
+                if (type.Equals("Debtors", StringComparison.OrdinalIgnoreCase) || type.Equals("Debtor", StringComparison.OrdinalIgnoreCase))
+                {
+                    vm.TotalDebtors += amount;
+                    vm.CurrentAssetsTotal += amount;
+                    continue;
+                }
+                // CURRENT LIABILITIES = all other liabilities except PD
+                if (type.Equals("Liabilities", StringComparison.OrdinalIgnoreCase))
+                {
+                    vm.CurrentLiabilityLines.Add(new BalanceSheetLineVm
+                    {
+                        AccountCode = code,
+                        AccountName = name,
+                        AccountType = type,
+                        Amount = amount
+                    });
+
+                    vm.CurrentLiabilitiesTotal += amount;
+                    continue;
+                }
+                // Get TC accounts
+                if (type.Equals("Creditors", StringComparison.OrdinalIgnoreCase) || type.Equals("Creditor", StringComparison.OrdinalIgnoreCase))
+                {
+                    vm.TotalCreditors += amount;
+                    vm.CurrentLiabilitiesTotal += amount;
+                    continue;
+                }
+            }
+            // calculated totals
+            vm.EquityTotal = vm.ShareCapitalTotal + vm.ProfitAndLossTotal;
+            vm.NetFixedAssets = vm.FixedAssetsFaTotal + vm.FixedAssetsPdTotal;
+            vm.NetCurrentAssets = vm.CurrentAssetsTotal + vm.CurrentLiabilitiesTotal;
+            vm.TotalAssetsLessLiabilities = vm.NetFixedAssets + vm.NetCurrentAssets;
+
+            vm.FixedAssetLines = vm.FixedAssetLines
+                .OrderBy(x => x.AccountCode)
+                .ToList();
+
+            vm.CurrentAssetLines = vm.CurrentAssetLines
+                .OrderBy(x => x.AccountCode)
+                .ToList();
+
+            vm.CurrentLiabilityLines = vm.CurrentLiabilityLines
+                .OrderBy(x => x.AccountCode)
+                .ToList();
+
+            return vm;
         }
 
         // ----------------------------
@@ -223,7 +377,7 @@ namespace GLPack.Services
             var sb = new StringBuilder();
             var csv = new CsvWriter(sb);
 
-            csv.WriteRow("Code", "Description", "Amount");
+            csv.WriteRow("Code", "Description", "Amount", "Total");
 
             foreach (var row in rows)
             {
@@ -244,6 +398,49 @@ namespace GLPack.Services
                     );
                 }
             }
+
+            return sb.ToString();
+        }
+
+        public async Task<string> GetBalanceSheetCsvAsync(int companyId, CancellationToken ct)
+        {
+            var bs = await GetBalanceSheetAsync(companyId, ct);
+
+            var sb = new StringBuilder();
+            var csv = new CsvWriter(sb);
+
+            csv.WriteRow("Section", "Code", "Description", "Amount");
+
+            csv.WriteRow("Equity", "", "Share Capital", bs.ShareCapitalTotal.ToString("0.00", CultureInfo.InvariantCulture));
+            csv.WriteRow("Equity", "", "Profit and Loss Account", bs.ProfitAndLossTotal.ToString("0.00", CultureInfo.InvariantCulture));
+            csv.WriteRow("Equity", "", "Total Equity", bs.EquityTotal.ToString("0.00", CultureInfo.InvariantCulture));
+
+            csv.WriteRow();
+            csv.WriteRow("Represented by", "", "", "");
+
+            foreach (var row in bs.FixedAssetLines)
+            {
+                csv.WriteRow("Fixed Assets", row.AccountCode, row.AccountName, row.Amount.ToString("0.00", CultureInfo.InvariantCulture));
+            }
+            csv.WriteRow("Fixed Assets", "", "Net Fixed Assets", bs.NetFixedAssets.ToString("0.00", CultureInfo.InvariantCulture));
+
+            csv.WriteRow();
+            foreach (var row in bs.CurrentAssetLines)
+            {
+                csv.WriteRow("Current Assets", row.AccountCode, row.AccountName, row.Amount.ToString("0.00", CultureInfo.InvariantCulture));
+            }
+            csv.WriteRow("Current Assets", "", "Total Current Assets", bs.CurrentAssetsTotal.ToString("0.00", CultureInfo.InvariantCulture));
+
+            csv.WriteRow();
+
+            foreach (var row in bs.CurrentLiabilityLines)
+            {
+                csv.WriteRow("Current Liabilities", row.AccountCode, row.AccountName, row.Amount.ToString("0.00", CultureInfo.InvariantCulture));
+            }
+            csv.WriteRow("Current Liabilities", "", "Total Current Liabilities", bs.CurrentLiabilitiesTotal.ToString("0.00", CultureInfo.InvariantCulture));
+
+            csv.WriteRow("", "", "Net Current Assets / (Liabilities)", bs.NetCurrentAssets.ToString("0.00", CultureInfo.InvariantCulture));
+            csv.WriteRow("", "", "Total Assets Less Liabilities", bs.TotalAssetsLessLiabilities.ToString("0.00", CultureInfo.InvariantCulture));
 
             return sb.ToString();
         }
@@ -281,6 +478,17 @@ namespace GLPack.Services
                 }
                 return value;
             }
+        }
+
+        private static bool HasPrefix(string code, string prefix)
+        {
+            return !string.IsNullOrWhiteSpace(code) &&
+                   code.Trim().StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static decimal GetNetBalance(decimal debit, decimal credit)
+        {
+            return debit - credit;
         }
     }
 }

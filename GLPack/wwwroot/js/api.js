@@ -44,7 +44,6 @@
     }
 
     // ----- Companies API -----
-
     function getCompanies() {
         // hits GET /api/companies
         return request("/api/companies");
@@ -71,9 +70,8 @@
     }
 
     // ----- Accounts API -----
-
     function getAccounts(companyId, opts = {}) {
-        const { q = "", page = 1, pageSize = 50 } = opts;
+        const { q = "", page = 1, pageSize = 10 } = opts;
         const params = new URLSearchParams();
         if (q) params.set("q", q);
         if (page) params.set("page", page);
@@ -103,25 +101,25 @@
     }
 
     // ----- Transactions API -----
-
     function getTransactions(companyId, opts = {}) {
         const {
             page = 1,
-            pageSize = 20,
-            from = null,
-            to = null
+            pageSize = 10,
+            q = "",
+            transactionNo = null,
+            from = "",
+            to = ""
         } = opts;
 
         const params = new URLSearchParams();
         params.set("page", page);
         params.set("pageSize", pageSize);
+        if (q) params.set("q", q);
         if (from) params.set("from", from);
         if (to) params.set("to", to);
+        if (transactionNo != null) params.set("transactionNo", String(transactionNo));
 
-        return request(`/api/companies/${companyId}/transactions?` + params.toString())
-            .then(data => ({
-                items: data,
-            }));
+        return request(`/api/companies/${companyId}/transactions?` + params.toString());
     }
 
     function createTransaction(companyId, dto) {
@@ -145,7 +143,6 @@
     }
 
     // ----- Accounts API -----
-
     function ledgerSearch(companyId, opts = {}) {
         const {
             q = "",
