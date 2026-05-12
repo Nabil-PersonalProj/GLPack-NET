@@ -267,20 +267,21 @@
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-4 py-2"></td>
                                 <td class="px-2 py-2">TOTAL SHARE CAPITAL</td>
-                                <td class="px-4 py-2 text-right">@Model.BalanceSheet.ShareCapitalTotal.ToString("N2")</td>
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.ShareCapitalTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                    @Math.Abs(Model.BalanceSheet.ShareCapitalTotal).ToString("N2")</td>
                             </tr>
 
                             <tr>
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">PROFIT AND LOSS ACCOUNT</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.ProfitAndLossTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.ProfitAndLossTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.ProfitAndLossTotal).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL EQUITY</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.EquityTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.EquityTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.EquityTotal).ToString("N2")</td>
                             </tr>
 
@@ -317,7 +318,7 @@
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">NET FIXED ASSETS</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.NetFixedAssets < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.NetFixedAssets < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.NetFixedAssets).ToString("N2")</td>
                             </tr>
 
@@ -347,7 +348,7 @@
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL CURRENT ASSETS</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.CurrentAssetsTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.CurrentAssetsTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.CurrentAssetsTotal).ToString("N2")</td>
                             </tr>
 
@@ -377,21 +378,21 @@
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-semibold">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL CURRENT LIABILITIES</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.CurrentLiabilitiesTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.CurrentLiabilitiesTotal < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.CurrentLiabilitiesTotal).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">NET CURRENT ASSETS / (LIABILITIES)</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.NetCurrentAssets < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.NetCurrentAssets < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.NetCurrentAssets).ToString("N2")</td>
                             </tr>
 
                             <tr class="bg-gray-50 dark:bg-neutral-900/40 font-bold border-t border-b border-gray-300 dark:border-neutral-700">
                                 <td class="px-3 py-2"></td>
                                 <td class="px-2 py-2">TOTAL ASSETS LESS LIABILITIES</td>
-                                <td class="px-3 py-2 text-right @(Model.BalanceSheet.TotalAssetsLessLiabilities < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
+                                <td class="px-4 py-2 text-right @(Model.BalanceSheet.TotalAssetsLessLiabilities < 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-neutral-100")">
                                     @Math.Abs(Model.BalanceSheet.TotalAssetsLessLiabilities).ToString("N2")</td>
                             </tr>
                         </tbody>

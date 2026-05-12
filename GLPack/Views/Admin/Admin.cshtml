@@ -1,0 +1,359 @@
+﻿@{
+ViewData["Title"] = "Admin Console";
+ViewData["Breadcrumb"] = "Admin Console";
+}
+
+<section class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-400 dark:text-neutral-500">
+                System Maintenance
+            </p>
+            <h1 class="text-2xl font-semibold tracking-tight">
+                Admin Console
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-neutral-400">
+                Manage account prefix rules and view application logs.
+            </p>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-neutral-800">
+        <nav class="flex gap-2" aria-label="Admin tabs">
+            <button type="button"
+                    data-admin-tab="prefixRules"
+                    class="admin-tab-btn rounded-t-lg px-4 py-2 text-sm font-medium border border-b-0
+                border-gray-200 dark:border-neutral-800
+                bg-white dark:bg-neutral-900
+                text-gray-900 dark:text-neutral-100">
+                <i class="fa-solid fa-code-branch mr-2"></i>
+                Prefix Rules
+            </button>
+
+            <button type="button"
+                    data-admin-tab="logs"
+                    class="admin-tab-btn rounded-t-lg px-4 py-2 text-sm font-medium border border-b-0
+                border-transparent
+                text-gray-500 dark:text-neutral-400
+                hover:text-gray-900 dark:hover:text-neutral-100">
+                <i class="fa-solid fa-clipboard-list mr-2"></i>
+                Logs
+            </button>
+
+            <button type="button"
+                    data-admin-tab="users"
+                    class="admin-tab-btn rounded-t-lg px-4 py-2 text-sm font-medium border border-b-0
+                border-transparent
+                text-gray-500 dark:text-neutral-400
+                hover:text-gray-900 dark:hover:text-neutral-100">
+                <i class="fa-solid fa-clipboard-list mr-2"></i>
+                Users
+            </button>
+        </nav>
+    </div>
+
+    <!-- Prefix Rules Tab -->
+    <div id="adminTab_prefixRules" class="admin-tab-panel space-y-4">
+        <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold">
+                        Account Type Prefix Rules
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-neutral-400">
+                        Configure how account code prefixes map to account types.
+                    </p>
+                </div>
+
+                <button type="button"
+                        id="btnAddPrefixRule"
+                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium
+                    text-white hover:bg-indigo-500">
+                    <i class="fa-solid fa-plus mr-2"></i>
+                    New Rule
+                </button>
+            </div>
+
+            <div class="mt-5 overflow-x-auto rounded-xl border border-gray-200 dark:border-neutral-800">
+                <table class="min-w-full text-sm">
+                    <thead class="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900/60">
+                        <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                            <th class="px-4 py-3 w-40">Prefix</th>
+                            <th class="px-4 py-3">Account Type</th>
+                            <th class="px-4 py-3 w-40 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prefixRulesTableBody"
+                           class="divide-y divide-gray-100 dark:divide-neutral-800">
+                        <tr>
+                            <td colspan="3" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                                Prefix rules will load here.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div id="adminTab_logs" class="admin-tab-panel hidden space-y-4">
+        <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold">
+                        Application Logs
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-neutral-400">
+                        View records from the AppLogs table.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Filters placeholder -->
+            <div class="mt-5 grid gap-3 md:grid-cols-4">
+                <input id="adminLogsSearch"
+                       type="text"
+                       placeholder="Search logs..."
+                       class="rounded-lg border border-gray-300 dark:border-neutral-700
+                bg-white dark:bg-neutral-950 px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
+                <select id="adminLogsLevel"
+                        class="rounded-lg border border-gray-300 dark:border-neutral-700
+                    bg-white dark:bg-neutral-950 px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="">All levels</option>
+                    <option value="Info">Info</option>
+                    <option value="Warn">Warn</option>
+                    <option value="Error">Error</option>
+                </select>
+
+                <input id="adminLogsEventType"
+                       type="text"
+                       placeholder="Event type..."
+                       class="rounded-lg border border-gray-300 dark:border-neutral-700
+                bg-white dark:bg-neutral-950 px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
+                <button type="button"
+                        id="btnRefreshLogs"
+                        class="inline-flex items-center justify-center rounded-lg border
+                    border-gray-200 dark:border-neutral-700
+                    px-3 py-2 text-sm
+                    text-gray-700 dark:text-neutral-100
+                    hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i class="fa-solid fa-rotate-right mr-2"></i>
+                    Refresh
+                </button>
+            </div>
+
+            <div class="mt-5 overflow-x-auto rounded-xl border border-gray-200 dark:border-neutral-800">
+                <table class="min-w-full text-xs">
+                    <thead class="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900/60">
+                        <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                            <th class="px-3 py-3 w-40">Time UTC</th>
+                            <th class="px-3 py-3 w-24">Level</th>
+                            <th class="px-3 py-3 w-36">Event Type</th>
+                            <th class="px-3 py-3 w-36">Code</th>
+                            <th class="px-3 py-3">Message</th>
+                            <th class="px-3 py-3 w-40">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminLogsTableBody"
+                           class="divide-y divide-gray-100 dark:divide-neutral-800">
+                        <tr>
+                            <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                                Logs will load here.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="adminLogsPager"
+                 class="flex items-center justify-between px-1 py-3 text-sm text-gray-500 dark:text-neutral-400">
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="adminTab_users" class="admin-tab-panel hidden space-y-4">
+        <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold">
+                        Users
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-neutral-400">
+                        View, create, update, and manage application users.
+                    </p>
+                </div>
+
+                <button type="button"
+                        id="btnAddUser"
+                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium
+                    text-white hover:bg-indigo-500">
+                    <i class="fa-solid fa-plus mr-2"></i>
+                    New User
+                </button>
+            </div>
+
+            <div class="mt-5 overflow-x-auto rounded-xl border border-gray-200 dark:border-neutral-800">
+                <table class="min-w-full text-sm">
+                    <thead class="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900/60">
+                        <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">
+                            <th class="px-4 py-3 w-20">Id</th>
+                            <th class="px-4 py-3">Email</th>
+                            <th class="px-4 py-3 w-28">Admin</th>
+                            <th class="px-4 py-3 w-28">Active</th>
+                            <th class="px-4 py-3 w-44">Last Login UTC</th>
+                            <th class="px-4 py-3 w-72 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminUsersTableBody"
+                           class="divide-y divide-gray-100 dark:divide-neutral-800">
+                        <tr>
+                            <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                                Users will load here.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prefix Rule Modal -->
+    <div id="prefixRuleModal"
+         class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 px-4">
+        <div class="w-full max-w-md rounded-2xl border border-gray-200 dark:border-neutral-800
+            bg-white dark:bg-neutral-900 shadow-xl">
+
+            <div class="flex items-center justify-between border-b border-gray-200 dark:border-neutral-800 px-5 py-4">
+                <div>
+                    <h2 id="prefixRuleModalTitle" class="text-lg font-semibold">
+                        New Prefix Rule
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-neutral-400">
+                        Map an account code prefix to an account type.
+                    </p>
+                </div>
+
+                <button type="button"
+                        id="btnClosePrefixRuleModal"
+                        class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700
+                    dark:hover:bg-neutral-800 dark:hover:text-neutral-100">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="prefixRuleForm" class="space-y-4 px-5 py-5">
+                <input type="hidden" id="prefixRuleMode" value="create" />
+
+                <div>
+                    <label for="prefixRulePrefix"
+                           class="mb-1 block text-sm font-medium text-gray-700 dark:text-neutral-200">
+                        Prefix
+                    </label>
+                    <input id="prefixRulePrefix"
+                           type="text"
+                           maxlength="10"
+                           placeholder="e.g. FA, PD, SA"
+                           class="w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                    bg-white dark:bg-neutral-950 px-3 py-2 text-sm uppercase
+                    focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
+                        Prefix will be saved in uppercase.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="prefixRuleAccountType"
+                           class="mb-1 block text-sm font-medium text-gray-700 dark:text-neutral-200">
+                        Account Type
+                    </label>
+                    <select id="prefixRuleAccountType"
+                            class="w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                        bg-white dark:bg-neutral-950 px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        <option value="">Select account type</option>
+                    </select>
+                </div>
+
+                <div id="prefixRuleError"
+                     class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700
+                    dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-300">
+                </div>
+
+                <div class="flex justify-end gap-2 border-t border-gray-200 dark:border-neutral-800 pt-4">
+                    <button type="button"
+                            id="btnCancelPrefixRuleModal"
+                            class="rounded-lg border border-gray-300 dark:border-neutral-700 px-4 py-2 text-sm
+                        text-gray-700 dark:text-neutral-100
+                        hover:bg-gray-100 dark:hover:bg-neutral-800">
+                        Cancel
+                    </button>
+
+                    <button type="submit"
+                            id="btnSavePrefixRule"
+                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white
+                        hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">
+                        Save Rule
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</section>
+
+@section Scripts {
+    <script>
+        window.__page__ = {
+            name: "adminIndex"
+        };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const buttons = Array.from(document.querySelectorAll(".admin-tab-btn"));
+            const panels = {
+                prefixRules: document.getElementById("adminTab_prefixRules"),
+                logs: document.getElementById("adminTab_logs"),
+                users: document.getElementById("adminTab_users"),
+            };
+
+            function activateTab(tabName) {
+                buttons.forEach(btn => {
+                    const isActive = btn.dataset.adminTab === tabName;
+
+                    btn.classList.toggle("bg-white", isActive);
+                    btn.classList.toggle("dark:bg-neutral-900", isActive);
+                    btn.classList.toggle("text-gray-900", isActive);
+                    btn.classList.toggle("dark:text-neutral-100", isActive);
+                    btn.classList.toggle("border-gray-200", isActive);
+                    btn.classList.toggle("dark:border-neutral-800", isActive);
+
+                    btn.classList.toggle("border-transparent", !isActive);
+                    btn.classList.toggle("text-gray-500", !isActive);
+                    btn.classList.toggle("dark:text-neutral-400", !isActive);
+                });
+
+                Object.entries(panels).forEach(([key, panel]) => {
+                    if (!panel) return;
+                    panel.classList.toggle("hidden", key !== tabName);
+                });
+            }
+
+            buttons.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    activateTab(btn.dataset.adminTab);
+                });
+            });
+
+            activateTab("prefixRules");
+        });
+    </script>
+}

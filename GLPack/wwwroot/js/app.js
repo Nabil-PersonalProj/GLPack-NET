@@ -13,6 +13,8 @@
             initTransactionsIndex();
         } else if (page === "ledgerSearch") {
             initLedgerSearch();
+        } else if (page === "adminIndex") {
+            initAdminIndex();
         }
     });
 
@@ -304,7 +306,6 @@
 
         function rowHtml(row, index) {
             if (row._mode === "edit" || row._mode === "new") {
-                const isNew = row._mode === "new";
                 return `
                     <tr data-index="${index}" class="bg-neutral-900/10 dark:bg-neutral-800/60">
                       <td class="px-3 py-2">
@@ -1698,6 +1699,693 @@
         }
     }
 
+    // ---------- Admin Page ----------
+    function initAdminIndex() {
+        initAdminLogs();
+        initAdminPrefixRules();
+        initAdminUsers();
+    }
+
+    function initAdminLogs() {
+        const tbody = document.querySelector("#adminLogsTableBody");
+        const pagerHost = document.querySelector("#adminLogsPager");
+        const searchInput = document.querySelector("#adminLogsSearch");
+        const levelSelect = document.querySelector("#adminLogsLevel");
+        const eventTypeInput = document.querySelector("#adminLogsEventType");
+        const refreshBtn = document.querySelector("#btnRefreshLogs");
+
+        if (!tbody) return;
+
+        let currentPage = 1;
+        const pageSize = 50;
+        let searchTimer = null;
+
+        async function loadLogs() {
+            try {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        Loading logs...
+                    </td>
+                </tr>
+            `;
+
+                const result = await API.getLogs({
+                    q: (searchInput?.value || "").trim(),
+                    level: (levelSelect?.value || "").trim(),
+                    eventType: (eventTypeInput?.value || "").trim(),
+                    page: currentPage,
+                    pageSize
+                });
+
+                const items = result.items || result.Items || [];
+                const totalCount = result.totalCount ?? result.TotalCount ?? 0;
+
+                renderLogs(items);
+                renderPager(pagerHost, currentPage, pageSize, totalCount, (nextPage) => {
+                    currentPage = nextPage;
+                    loadLogs();
+                });
+            } catch (err) {
+                console.error("Failed to load admin logs", err);
+
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-red-500">
+                        Failed to load logs: ${escapeHtml(err.message || "Unknown error")}
+                    </td>
+                </tr>
+            `;
+
+                if (pagerHost) pagerHost.innerHTML = "";
+            }
+        }
+
+        function renderLogs(items) {
+            if (!items.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        No logs found.
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = items.map(log => {
+                const tsUtc = log.tsUtc || log.TsUtc || "";
+                const level = log.level || log.Level || "";
+                const eventType = log.eventType || log.EventType || "";
+                const logCode = log.logCode || log.LogCode || "";
+                const logMessage = log.logMessage || log.LogMessage || "";
+                const sourceFile = log.sourceFile || log.SourceFile || "";
+                const sourceFunction = log.sourceFunction || log.SourceFunction || "";
+
+                const source = [sourceFile, sourceFunction]
+                    .filter(Boolean)
+                    .join(" / ");
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                    <td class="px-3 py-3 whitespace-nowrap text-gray-500 dark:text-neutral-400">
+                        ${escapeHtml(formatDateTime(tsUtc))}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                        ${renderLogLevelBadge(level)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                        ${escapeHtml(eventType)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap font-mono text-[11px]">
+                        ${escapeHtml(logCode)}
+                    </td>
+                    <td class="px-3 py-3">
+                        ${escapeHtml(logMessage)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap text-gray-500 dark:text-neutral-400">
+                        ${escapeHtml(source)}
+                    </td>
+                </tr>
+            `;
+            }).join("");
+        }
+
+        function reloadFromFirstPage() {
+            currentPage = 1;
+            loadLogs();
+        }
+
+        refreshBtn?.addEventListener("click", reloadFromFirstPage);
+
+        levelSelect?.addEventListener("change", reloadFromFirstPage);
+
+        searchInput?.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(reloadFromFirstPage, 300);
+        });
+
+        eventTypeInput?.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(reloadFromFirstPage, 300);
+        });
+
+        loadLogs();
+    }
+
+    function renderLogLevelBadge(level) {
+        const normalized = (level || "").toUpperCase();
+
+        let cls = "bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-neutral-200";
+
+        if (normalized === "ERROR") {
+            cls = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+        } else if (normalized === "WARN" || normalized === "WARNING") {
+            cls = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
+        } else if (normalized === "INFO") {
+            cls = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+        }
+
+        return `
+        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}">
+            ${escapeHtml(level || "-")}
+        </span>
+    `;
+    }
+
+    function formatDateTime(value) {
+        if (!value) return "";
+
+        const d = new Date(value);
+
+        if (Number.isNaN(d.getTime())) {
+            return value;
+        }
+
+        return d.toLocaleString();
+    }
+
+    function initAdminPrefixRules() {
+        const tbody = document.querySelector("#prefixRulesTableBody");
+        const addBtn = document.querySelector("#btnAddPrefixRule");
+
+        const modal = document.querySelector("#prefixRuleModal");
+        const modalTitle = document.querySelector("#prefixRuleModalTitle");
+        const form = document.querySelector("#prefixRuleForm");
+        const modeInput = document.querySelector("#prefixRuleMode");
+        const prefixInput = document.querySelector("#prefixRulePrefix");
+        const accountTypeSelect = document.querySelector("#prefixRuleAccountType");
+        const errorBox = document.querySelector("#prefixRuleError");
+        const saveBtn = document.querySelector("#btnSavePrefixRule");
+        const closeBtn = document.querySelector("#btnClosePrefixRuleModal");
+        const cancelBtn = document.querySelector("#btnCancelPrefixRuleModal");
+
+        let accountTypes = [];
+        let editingPrefix = "";
+
+        if (!tbody) return;
+
+        async function loadAccountTypes() {
+            if (accountTypes.length) return accountTypes;
+
+            accountTypes = await API.getAccountTypes();
+
+            accountTypeSelect.innerHTML = `
+            <option value="">Select account type</option>
+            ${(accountTypes || []).map(type => `
+                <option value="${escapeHtml(type)}">${escapeHtml(type)}</option>
+            `).join("")}
+        `;
+
+            return accountTypes;
+        }
+
+        function showPrefixRuleError(message) {
+            if (!errorBox) return;
+
+            errorBox.textContent = message || "";
+            errorBox.classList.toggle("hidden", !message);
+        }
+
+        function openPrefixRuleModal(mode, rule = null) {
+            showPrefixRuleError("");
+
+            const isEdit = mode === "edit";
+            editingPrefix = isEdit ? (rule?.prefix || "") : "";
+
+            modeInput.value = mode;
+            modalTitle.textContent = isEdit ? "Edit Prefix Rule" : "New Prefix Rule";
+
+            prefixInput.value = isEdit ? (rule?.prefix || "") : "";
+            prefixInput.disabled = isEdit;
+
+            accountTypeSelect.value = isEdit ? (rule?.accountType || "") : "";
+
+            saveBtn.textContent = isEdit ? "Save Changes" : "Create Rule";
+
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+
+            setTimeout(() => {
+                if (isEdit) {
+                    accountTypeSelect.focus();
+                } else {
+                    prefixInput.focus();
+                }
+            }, 0);
+        }
+
+        function closePrefixRuleModal() {
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+
+            form.reset();
+            prefixInput.disabled = false;
+            editingPrefix = "";
+            showPrefixRuleError("");
+        }
+
+        async function loadPrefixRules() {
+            try {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        Loading prefix rules...
+                    </td>
+                </tr>
+            `;
+
+                const rules = await API.getAccountPrefixRules();
+                renderPrefixRules(rules || []);
+            } catch (err) {
+                console.error("Failed to load prefix rules", err);
+
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="px-4 py-6 text-center text-red-500">
+                        Failed to load prefix rules: ${escapeHtml(err.message || "Unknown error")}
+                    </td>
+                </tr>
+            `;
+            }
+        }
+
+        function renderPrefixRules(rules) {
+            if (!rules.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        No prefix rules found.
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = rules.map(rule => {
+                const prefix = rule.prefix || rule.Prefix || "";
+                const accountType = rule.accountType || rule.AccountType || "";
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                    <td class="px-4 py-3 font-mono font-semibold">
+                        ${escapeHtml(prefix)}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${escapeHtml(accountType)}
+                    </td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <button type="button"
+                                class="btn-edit-prefix-rule inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                                       px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                                       hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                data-prefix="${escapeHtml(prefix)}"
+                                data-account-type="${escapeHtml(accountType)}">
+                            <i class="fa-solid fa-pen mr-1"></i>
+                            Edit
+                        </button>
+
+                        <button type="button"
+                                class="btn-delete-prefix-rule ml-2 inline-flex items-center rounded-lg border border-red-200 dark:border-red-900/60
+                                       px-3 py-1.5 text-xs text-red-600 dark:text-red-300
+                                       hover:bg-red-50 dark:hover:bg-red-900/20"
+                                data-prefix="${escapeHtml(prefix)}">
+                            <i class="fa-solid fa-trash mr-1"></i>
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join("");
+        }
+
+        addBtn?.addEventListener("click", async () => {
+            try {
+                await loadAccountTypes();
+                openPrefixRuleModal("create");
+            } catch (err) {
+                alert(err.message || "Failed to load account types.");
+            }
+        });
+
+        closeBtn?.addEventListener("click", closePrefixRuleModal);
+        cancelBtn?.addEventListener("click", closePrefixRuleModal);
+
+        modal?.addEventListener("click", (e) => {
+            if (e.target === modal) {
+                closePrefixRuleModal();
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+                closePrefixRuleModal();
+            }
+        });
+
+        form?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const mode = modeInput.value;
+            const cleanPrefix = prefixInput.value.trim().toUpperCase();
+            const cleanAccountType = accountTypeSelect.value.trim();
+
+            if (!cleanPrefix) {
+                showPrefixRuleError("Prefix is required.");
+                prefixInput.focus();
+                return;
+            }
+
+            if (!cleanAccountType) {
+                showPrefixRuleError("Account type is required.");
+                accountTypeSelect.focus();
+                return;
+            }
+
+            saveBtn.disabled = true;
+            showPrefixRuleError("");
+
+            try {
+                if (mode === "edit") {
+                    await API.updateAccountPrefixRule(editingPrefix, {
+                        prefix: editingPrefix,
+                        accountType: cleanAccountType
+                    });
+                } else {
+                    await API.createAccountPrefixRule({
+                        prefix: cleanPrefix,
+                        accountType: cleanAccountType
+                    });
+                }
+
+                closePrefixRuleModal();
+                await loadPrefixRules();
+            } catch (err) {
+                showPrefixRuleError(err.message || "Failed to save prefix rule.");
+            } finally {
+                saveBtn.disabled = false;
+            }
+        });
+
+        tbody.addEventListener("click", async (e) => {
+            const editBtn = e.target.closest(".btn-edit-prefix-rule");
+            const deleteBtn = e.target.closest(".btn-delete-prefix-rule");
+
+            if (editBtn) {
+                const prefix = editBtn.dataset.prefix || "";
+                const accountType = editBtn.dataset.accountType || "";
+
+                try {
+                    await loadAccountTypes();
+                    openPrefixRuleModal("edit", {
+                        prefix,
+                        accountType
+                    });
+                } catch (err) {
+                    alert(err.message || "Failed to load account types.");
+                }
+
+                return;
+            }
+
+            if (deleteBtn) {
+                const prefix = deleteBtn.dataset.prefix || "";
+
+                const ok = confirm(
+                    `Delete prefix rule '${prefix}'?\n\nThis will not delete accounts, but new account type auto-detection may no longer recognise this prefix.`
+                );
+
+                if (!ok) return;
+
+                try {
+                    await API.deleteAccountPrefixRule(prefix);
+                    await loadPrefixRules();
+                } catch (err) {
+                    alert(err.message || "Failed to delete prefix rule.");
+                }
+            }
+        });
+
+        loadPrefixRules();
+    }
+
+    function initAdminUsers() {
+        const tbody = document.querySelector("#adminUsersTableBody");
+        const addBtn = document.querySelector("#btnAddUser");
+
+        if (!tbody) return;
+
+        async function loadUsers() {
+            try {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        Loading users...
+                    </td>
+                </tr>
+            `;
+
+                const users = await API.getAdminUsers();
+                renderUsers(users || []);
+            } catch (err) {
+                console.error("Failed to load users", err);
+
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-red-500">
+                        Failed to load users: ${escapeHtml(err.message || "Unknown error")}
+                    </td>
+                </tr>
+            `;
+            }
+        }
+
+        function renderUsers(users) {
+            if (!users.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        No users found.
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = users.map(user => {
+                const id = user.id ?? user.Id;
+                const email = user.email || user.Email || "";
+                const isAdmin = user.isAdmin ?? user.IsAdmin ?? false;
+                const isActive = user.isActive ?? user.IsActive ?? false;
+                const lastLoginAtUtc = user.lastLoginAtUtc || user.LastLoginAtUtc || "";
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                    <td class="px-4 py-3 font-mono text-xs">
+                        ${escapeHtml(String(id))}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${escapeHtml(email)}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${renderBoolBadge(isAdmin, "Admin", "User")}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${renderBoolBadge(isActive, "Active", "Inactive")}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-neutral-400">
+                        ${escapeHtml(formatDateTime(lastLoginAtUtc))}
+                    </td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <button type="button"
+                                class="btn-edit-admin-user inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                                       px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                                       hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                data-id="${escapeHtml(String(id))}"
+                                data-email="${escapeHtml(email)}"
+                                data-is-admin="${isAdmin ? "true" : "false"}"
+                                data-is-active="${isActive ? "true" : "false"}">
+                            <i class="fa-solid fa-pen mr-1"></i>
+                            Edit
+                        </button>
+
+                        <button type="button"
+                                class="btn-reset-admin-user-password ml-2 inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                                       px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                                       hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                data-id="${escapeHtml(String(id))}"
+                                data-email="${escapeHtml(email)}">
+                            <i class="fa-solid fa-key mr-1"></i>
+                            Password
+                        </button>
+
+                        <button type="button"
+                                class="btn-delete-admin-user ml-2 inline-flex items-center rounded-lg border border-red-200 dark:border-red-900/60
+                                       px-3 py-1.5 text-xs text-red-600 dark:text-red-300
+                                       hover:bg-red-50 dark:hover:bg-red-900/20"
+                                data-id="${escapeHtml(String(id))}"
+                                data-email="${escapeHtml(email)}">
+                            <i class="fa-solid fa-trash mr-1"></i>
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join("");
+        }
+
+        addBtn?.addEventListener("click", async () => {
+            const email = prompt("Enter user email:");
+
+            if (email === null) return;
+
+            const cleanEmail = email.trim().toLowerCase();
+
+            if (!cleanEmail) {
+                alert("Email is required.");
+                return;
+            }
+
+            const password = prompt("Enter initial password:");
+
+            if (password === null) return;
+
+            if (!password.trim()) {
+                alert("Password is required.");
+                return;
+            }
+
+            const isAdmin = confirm("Should this user be an admin?");
+
+            try {
+                await API.createAdminUser({
+                    email: cleanEmail,
+                    password,
+                    isAdmin,
+                    isActive: true
+                });
+
+                await loadUsers();
+            } catch (err) {
+                alert(err.message || "Failed to create user.");
+            }
+        });
+
+        tbody.addEventListener("click", async (e) => {
+            const editBtn = e.target.closest(".btn-edit-admin-user");
+            const resetBtn = e.target.closest(".btn-reset-admin-user-password");
+            const deleteBtn = e.target.closest(".btn-delete-admin-user");
+
+            if (editBtn) {
+                const id = editBtn.dataset.id;
+                const currentEmail = editBtn.dataset.email || "";
+                const currentIsAdmin = editBtn.dataset.isAdmin === "true";
+                const currentIsActive = editBtn.dataset.isActive === "true";
+
+                const email = prompt("Edit email:", currentEmail);
+
+                if (email === null) return;
+
+                const cleanEmail = email.trim().toLowerCase();
+
+                if (!cleanEmail) {
+                    alert("Email is required.");
+                    return;
+                }
+
+                const isAdmin = confirm(
+                    currentIsAdmin
+                        ? "Keep this user as admin?\n\nOK = Admin, Cancel = Normal user"
+                        : "Make this user admin?\n\nOK = Admin, Cancel = Normal user"
+                );
+
+                const isActive = confirm(
+                    currentIsActive
+                        ? "Keep this user active?\n\nOK = Active, Cancel = Inactive"
+                        : "Activate this user?\n\nOK = Active, Cancel = Inactive"
+                );
+
+                try {
+                    await API.updateAdminUser(id, {
+                        email: cleanEmail,
+                        isAdmin,
+                        isActive
+                    });
+
+                    await loadUsers();
+                } catch (err) {
+                    alert(err.message || "Failed to update user.");
+                }
+
+                return;
+            }
+
+            if (resetBtn) {
+                const id = resetBtn.dataset.id;
+                const email = resetBtn.dataset.email || "";
+
+                const password = prompt(`Enter new password for ${email}:`);
+
+                if (password === null) return;
+
+                if (!password.trim()) {
+                    alert("Password is required.");
+                    return;
+                }
+
+                try {
+                    await API.resetAdminUserPassword(id, {
+                        password
+                    });
+
+                    alert("Password updated.");
+                } catch (err) {
+                    alert(err.message || "Failed to reset password.");
+                }
+
+                return;
+            }
+
+            if (deleteBtn) {
+                const id = deleteBtn.dataset.id;
+                const email = deleteBtn.dataset.email || "";
+
+                const ok = confirm(
+                    `Delete user '${email}'?\n\nThis cannot be undone.`
+                );
+
+                if (!ok) return;
+
+                try {
+                    await API.deleteAdminUser(id);
+                    await loadUsers();
+                } catch (err) {
+                    alert(err.message || "Failed to delete user.");
+                }
+            }
+        });
+
+        loadUsers();
+    }
+
+    function renderBoolBadge(value, trueText, falseText) {
+        if (value) {
+            return `
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700
+                         dark:bg-green-900/30 dark:text-green-300">
+                ${escapeHtml(trueText)}
+            </span>
+        `;
+        }
+
+        return `
+        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700
+                     dark:bg-neutral-800 dark:text-neutral-200">
+            ${escapeHtml(falseText)}
+        </span>
+    `;
+    }
+
     // ---------- helpers ----------
     function showAlert(host, type, msg) {
         if (!host) return;
@@ -1734,6 +2422,4 @@
             t = setTimeout(() => fn(...args), ms);
         };
     }
-
-    function qs(sel) { return document.querySelector(sel); }
 })();
