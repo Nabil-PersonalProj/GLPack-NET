@@ -152,5 +152,82 @@ namespace GLPack.Services
                 sourceFunction: nameof(DeleteAsync),
                 ct: ct);
         }
+
+        public async Task<AccountDto> CreateFromPrefixAsync(AccountCreateFromPrefixDto dto, CancellationToken ct)
+        {
+            var prefix = (dto.Prefix ?? "").Trim().ToUpperInvariant();
+            var name = (dto.Name ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(prefix))
+                throw new InvalidOperationException("Prefix is required.");
+
+            if (string.IsNullOrWhiteSpace(name))
+                throw new InvalidOperationException("Account name is required.");
+
+            var prefixRule = await _db.AccountTypePrefixes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Prefix == prefix, ct);
+
+            if (prefixRule is null)
+                throw new InvalidOperationException($"Prefix rule '{prefix}' was not found.");
+
+            var nextCode = await GenerateNextAccountCodeAsync(dto.CompanyId, prefix, ct);
+
+            var entity = new Account
+            {
+                CompanyId = dto.CompanyId,
+                Code = nextCode,
+                Name = name,
+                Type = prefixRule.AccountType
+            };
+
+            _db.Accounts.Add(entity);
+            await _db.SaveChangesAsync(ct);
+
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "ACCOUNTS_CREATE_FROM_PREFIX_OK",
+                logMessage: $"Created account {entity.Code} from prefix {prefix}",
+                companyId: entity.CompanyId,
+                sourceFile: nameof(AccountsService),
+                sourceFunction: nameof(CreateFromPrefixAsync),
+                ct: ct);
+
+            return new AccountDto
+            {
+                Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                AccountCode = entity.Code,
+                Name = entity.Name,
+                Type = entity.Type
+            };
+        }
+        private async Task<string> GenerateNextAccountCodeAsync(int companyId, string prefix, CancellationToken ct)
+        {
+            var existingCodes = await _db.Accounts
+                .AsNoTracking()
+                .Where(a => a.CompanyId == companyId && a.Code.StartsWith(prefix))
+                .Select(a => a.Code)
+                .ToListAsync(ct);
+
+            var maxNumber = 0;
+
+            foreach (var code in existingCodes)
+            {
+                if (code.Length <= prefix.Length)
+                    continue;
+
+                var numberPart = code[prefix.Length..];
+
+                if (int.TryParse(numberPart, out var number) && number > maxNumber)
+                {
+                    maxNumber = number;
+                }
+            }
+
+            var nextNumber = maxNumber + 1;
+            return $"{prefix}{nextNumber:000}";
+        }
     }
 }

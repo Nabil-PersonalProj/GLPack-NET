@@ -268,17 +268,6 @@
 
         <div class="space-y-4 px-5 py-4">
             <div>
-                <label for="txQuickAccountCode"
-                       class="mb-1 block text-xs font-medium text-gray-700 dark:text-neutral-300">
-                    Account Code
-                </label>
-                <input id="txQuickAccountCode"
-                       type="text"
-                       class="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-gray-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                       placeholder="e.g. 5100" />
-            </div>
-
-            <div>
                 <label for="txQuickAccountName"
                        class="mb-1 block text-xs font-medium text-gray-700 dark:text-neutral-300">
                     Account Name
@@ -288,27 +277,23 @@
                        class="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-gray-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                        placeholder="e.g. Office Supplies" />
             </div>
-
             <div>
-                <label for="txQuickAccountType"
-                       class="mb-1 block text-xs font-medium text-gray-700 dark:text-neutral-300">
-                    Account Type
+                <label for="quickAccountPrefix"
+                       class="block text-xs font-medium text-gray-700 dark:text-neutral-200 mb-1">
+                    Prefix
                 </label>
-                <select id="txQuickAccountType"
-                        class="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-gray-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">Select type...</option>
-                    <option value="Asset">Asset</option>
-                    <option value="Liabilities">Liabilities</option>
-                    <option value="Expense">Expense</option>
-                    <option value="Equity">Equity</option>
-                    <option value="Profit & Loss">Profit & Loss</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Cost of Sale">Cost of Sale</option>
-                    <option value="Debtor">Debtor</option>
-                    <option value="Creditor">Creditor</option>
-                    <option value="Fixed Asset">Fixed Asset</option>
-                    <option value="Accumulated Depreciation">Accumulated Depreciation</option>
+
+                <select id="quickAccountPrefix"
+                        class="w-full rounded-lg border border-gray-300 dark:border-neutral-700
+                    bg-white dark:bg-neutral-950 px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="">Select prefix...</option>
                 </select>
+
+                <p id="quickAccountTypePreview"
+                       class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
+                    Account type comes from selected prefix.
+                </p>
             </div>
         </div>
 

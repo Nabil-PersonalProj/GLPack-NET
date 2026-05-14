@@ -87,6 +87,13 @@
         });
     }
 
+    function createAccountFromPrefix(companyId, dto) {
+        return request(`/api/companies/${companyId}/accounts/from-prefix`, {
+            method: "POST",
+            body: Object.assign({ companyId }, dto)
+        });
+    }
+
     function updateAccount(companyId, accountCode, dto) {
         return request(`/api/companies/${companyId}/accounts/${encodeURIComponent(accountCode)}`, {
             method: "PUT",
@@ -217,6 +224,10 @@
         });
     }
 
+    function getAccountPrefixRulesForAccounts(companyId) {
+        return request(`/api/companies/${companyId}/accounts/prefix-rules`);
+    }
+
     // ----- User Account API -----
     function getAdminUsers() {
         return request("/api/admin/users");
@@ -256,6 +267,7 @@
         companyDashboardUrl,
         getAccounts,
         createAccount,
+        createAccountFromPrefix,
         updateAccount,
         deleteAccount,
         getTransactions,
@@ -274,5 +286,6 @@
         resetAdminUserPassword,
         deleteAdminUser,
         getAccountTypes,
+        getAccountPrefixRulesForAccounts,
     };
 })(window);

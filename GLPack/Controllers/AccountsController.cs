@@ -1,6 +1,8 @@
 ﻿using GLPack.Contracts;
+using GLPack.DAL;
 using GLPack.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace GLPack.Controllers
 {
@@ -9,7 +11,13 @@ namespace GLPack.Controllers
     public class AccountsController : ControllerBase
     {
         private readonly IAccountsService _svc;
-        public AccountsController(IAccountsService svc) => _svc = svc;
+        private readonly ApplicationDbContext _db;
+
+        public AccountsController(IAccountsService svc, ApplicationDbContext db)
+        {
+            _svc = svc;
+            _db = db;
+        }
 
         [HttpGet]
         public async Task<ActionResult<PagedResult<AccountDto>>> List(
@@ -65,6 +73,44 @@ namespace GLPack.Controllers
         {
             await _svc.DeleteAsync(companyId, accountCode, ct);
             return NoContent();
+        }
+
+        [HttpPost("from-prefix")]
+        public async Task<ActionResult<AccountDto>> CreateFromPrefix(int companyId, [FromBody] AccountCreateFromPrefixDto dto,
+            CancellationToken ct)
+        {
+            if (dto.CompanyId != companyId)
+                return BadRequest("Mismatched companyId.");
+
+            try
+            {
+                var created = await _svc.CreateFromPrefixAsync(dto, ct);
+
+                return CreatedAtAction(
+                    nameof(Get),
+                    new { companyId, accountCode = created.AccountCode },
+                    created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ValidationProblem(detail: ex.Message);
+            }
+        }
+
+        [HttpGet("prefix-rules")]
+        public async Task<ActionResult<IReadOnlyList<AdminPrefixRuleDto>>> GetPrefixRules(int companyId, CancellationToken ct)
+        {
+            var rules = await _db.AccountTypePrefixes
+                .AsNoTracking()
+                .OrderBy(x => x.Prefix)
+                .Select(x => new AdminPrefixRuleDto
+                {
+                    Prefix = x.Prefix,
+                    AccountType = x.AccountType
+                })
+                .ToListAsync(ct);
+
+            return Ok(rules);
         }
     }
 }

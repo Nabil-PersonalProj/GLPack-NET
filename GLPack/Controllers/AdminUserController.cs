@@ -1,6 +1,7 @@
 ﻿using GLPack.Contracts;
 using GLPack.DAL;
 using GLPack.Models;
+using GLPack.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,10 +17,12 @@ namespace GLPack.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly PasswordHasher<AppUser> _passwordHasher = new();
+        private readonly IAppLogger _logger;
 
-        public AdminUserController(ApplicationDbContext db)
+        public AdminUserController(ApplicationDbContext db, IAppLogger logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         [HttpGet("users")]
@@ -74,10 +77,51 @@ namespace GLPack.Controllers
 
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
-            _db.AppUsers.Add(user);
-            await _db.SaveChangesAsync(ct);
+            try
+            {
+                _db.AppUsers.Add(user);
+                await _db.SaveChangesAsync(ct);
 
-            return Ok(ToAdminUserDto(user));
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "AUDIT",
+                        level: "INFO",
+                        logCode: "ADMIN_USER_CREATE_OK",
+                        logMessage: $"Admin created user {user.Email}.",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(CreateUser),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Do not fail the user creation just because logging failed.
+                }
+
+                return Ok(ToAdminUserDto(user));
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "ERROR",
+                        level: "ERROR",
+                        logCode: "ADMIN_USER_CREATE_FAILED",
+                        logMessage: $"Failed to create user {email}. Error: {ex.Message}",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(CreateUser),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Avoid masking the original SaveChanges error.
+                }
+
+                throw;
+            }
         }
 
         [HttpPut("users/{id:int}")]
@@ -116,9 +160,50 @@ namespace GLPack.Controllers
             user.IsAdmin = request.IsAdmin;
             user.IsActive = request.IsActive;
 
-            await _db.SaveChangesAsync(ct);
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "AUDIT",
+                        level: "INFO",
+                        logCode: "ADMIN_USER_UPDATE_OK",
+                        logMessage: $"Admin update user {user.Email}.",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(UpdateUser),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Do not fail the user creation just because logging failed.
+                }
 
-            return Ok(ToAdminUserDto(user));
+                return Ok(ToAdminUserDto(user));
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "ERROR",
+                        level: "ERROR",
+                        logCode: "ADMIN_USER_UPDATE_FAILED",
+                        logMessage: $"Failed to updateuser {email}. Error: {ex.Message}",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(UpdateUser),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Avoid masking the original SaveChanges error.
+                }
+
+                throw;
+
+            }
         }
 
         [HttpPost("users/{id:int}/reset-password")]
@@ -140,9 +225,50 @@ namespace GLPack.Controllers
 
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
-            await _db.SaveChangesAsync(ct);
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "AUDIT",
+                        level: "INFO",
+                        logCode: "ADMIN_USER_RESET_PASSWORD_OK",
+                        logMessage: $"Admin reset password for user {user.Email}.",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(ResetUserPassword),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Do not fail the user creation just because logging failed.
+                }
 
-            return NoContent();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "ERROR",
+                        level: "ERROR",
+                        logCode: "ADMIN_USER_RESET_PASSWORD_FAILED",
+                        logMessage: $"Failed to reset password for user {user.Email}. Error: {ex.Message}",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(ResetUserPassword),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Avoid masking the original SaveChanges error.
+                }
+
+                throw;
+
+            }
         }
 
         [HttpDelete("users/{id:int}")]
@@ -160,11 +286,52 @@ namespace GLPack.Controllers
             if (user is null)
                 return NotFound("User was not found.");
 
-            _db.AppUsers.Remove(user);
-            await _db.SaveChangesAsync(ct);
+            try
+            {
+                _db.AppUsers.Remove(user);
+                await _db.SaveChangesAsync(ct);
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "AUDIT",
+                        level: "INFO",
+                        logCode: "ADMIN_USER_DELETE_OK",
+                        logMessage: $"Admin delete user {user.Email}.",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(CreateUser),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Do not fail the user creation just because logging failed.
+                }
 
-            return NoContent();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    await _logger.LogAsync(
+                        eventType: "ERROR",
+                        level: "ERROR",
+                        logCode: "ADMIN_USER_DELETE_FAILED",
+                        logMessage: $"Failed to delete user {user.Email}. Error: {ex.Message}",
+                        companyId: null,
+                        sourceFile: nameof(AdminUserController),
+                        sourceFunction: nameof(CreateUser),
+                        ct: ct);
+                }
+                catch
+                {
+                    // Avoid masking the original SaveChanges error.
+                }
+
+                throw;
+            }
         }
+
 
         private int? GetCurrentUserId()
         {

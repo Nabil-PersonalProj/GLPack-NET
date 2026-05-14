@@ -227,6 +227,7 @@
         if (!companyId || !tbody) return;
 
         let rows = [];
+        let prefixRules = [];
         let currentPage = 1;
         let pageSize = 10;
         let totalCount = 0;
@@ -260,6 +261,19 @@
                   `;
                 if (pagerHost) pagerHost.innerHTML = "";
             }
+        }
+
+        async function loadPrefixRulesForAccounts() {
+            if (prefixRules.length) return prefixRules;
+
+            prefixRules = await API.getAccountPrefixRulesForAccounts(companyId);
+
+            prefixRules = (prefixRules || []).map(r => ({
+                prefix: r.prefix ?? r.Prefix ?? "",
+                accountType: r.accountType ?? r.AccountType ?? ""
+            }));
+
+            return prefixRules;
         }
 
         function normalizeAccount(acc) {
@@ -306,6 +320,14 @@
 
         function rowHtml(row, index) {
             if (row._mode === "edit" || row._mode === "new") {
+                const isNew = row._mode === "new";
+
+                const prefixOptions = prefixRules.map(rule => `
+                        <option value="${escapeHtml(rule.prefix)}" ${row.prefix === rule.prefix ? "selected" : ""}>
+                            ${escapeHtml(rule.prefix)} - ${escapeHtml(rule.accountType)}
+                        </option>
+                    `).join("");
+
                 return `
                     <tr data-index="${index}" class="bg-neutral-900/10 dark:bg-neutral-800/60">
                       <td class="px-3 py-2">
@@ -313,24 +335,51 @@
                                class="h-4 w-4 rounded border-gray-300 dark:border-neutral-600 acc-select"
                                ${row._selected ? "checked" : ""} />
                       </td>
+
                       <td class="px-3 py-2">
-                        <input data-field="accountCode"
-                               class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                      px-2 py-1 text-xs font-mono"
-                               value="${escapeHtml(row.accountCode || "")}" />
+                        ${isNew
+                                    ? `
+                                <select data-field="prefix"
+                                        class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                               px-2 py-1 text-xs font-mono">
+                                    <option value="">Select prefix...</option>
+                                    ${prefixOptions}
+                                </select>
+                              `
+                                    : `
+                                <input data-field="accountCode"
+                                       class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                              px-2 py-1 text-xs font-mono"
+                                       value="${escapeHtml(row.accountCode || "")}" />
+                              `
+                                }
                       </td>
+
                       <td class="px-3 py-2">
                         <input data-field="name"
                                class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
                                       px-2 py-1 text-xs"
                                value="${escapeHtml(row.name || "")}" />
                       </td>
+
                       <td class="px-3 py-2">
-                        <input data-field="type"
-                               class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                      px-2 py-1 text-xs"
-                               value="${escapeHtml(row.type || "")}" />
+                        ${isNew
+                                    ? `
+                                <span class="text-xs text-gray-500 dark:text-neutral-400">
+                                    ${escapeHtml(
+                                        prefixRules.find(r => r.prefix === row.prefix)?.accountType || "Type comes from prefix"
+                                    )}
+                                </span>
+                              `
+                                    : `
+                                <input data-field="type"
+                                       class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                              px-2 py-1 text-xs"
+                                       value="${escapeHtml(row.type || "")}" />
+                              `
+                                }
                       </td>
+
                       <td class="px-3 py-2 text-right space-x-2">
                         <button type="button"
                                 data-action="save"
@@ -344,8 +393,8 @@
                         </button>
                       </td>
                     </tr>
-                  `;
-            }
+                `;
+                        }
 
             // view mode
             return `
@@ -411,14 +460,21 @@
             if (!row) return;
 
             const code = (row.accountCode || "").trim();
+            const prefix = (row.prefix || "").trim().toUpperCase();
             const name = (row.name || "").trim();
             const type = (row.type || "").trim() || "Unknown";
-            const isActive = !!row.isActive;
+            const isActive = row.isActive !== false;
 
-            if (!code) {
+            if (row._mode === "new" && !prefix) {
+                showAlert(alertHost, "danger", "Prefix is required.");
+                return;
+            }
+
+            if (row._mode !== "new" && !code) {
                 showAlert(alertHost, "danger", "Account code is required.");
                 return;
             }
+
             if (!name) {
                 showAlert(alertHost, "danger", "Account name is required.");
                 return;
@@ -433,7 +489,11 @@
 
             try {
                 if (row._mode === "new") {
-                    const created = await API.createAccount(companyId, dto);
+                    const created = await API.createAccountFromPrefix(companyId, {
+                        prefix,
+                        name,
+                        isActive
+                    });
                     const normalized = normalizeAccount(created || dto);
                     rows[index] = Object.assign(normalized, { _mode: "view", _selected: true });
                     showAlert(alertHost, "success", "Account created.");
@@ -498,18 +558,31 @@
 
         // ---------- events ----------
         if (btnAdd) {
-            btnAdd.addEventListener("click", () => {
-                rows.unshift({
-                    accountCode: "",
-                    name: "",
-                    type: "",
-                    isActive: true,
-                    createdAt: null,
-                    _mode: "new",
-                    _selected: false,
-                    _orig: null
-                });
-                render();
+            btnAdd.addEventListener("click", async () => {
+                try {
+                    await loadPrefixRulesForAccounts();
+
+                    if (!prefixRules.length) {
+                        showAlert(alertHost, "danger", "No prefix rules found. Create prefix rules in Admin Console first.");
+                        return;
+                    }
+
+                    rows.unshift({
+                        accountCode: "",
+                        prefix: "",
+                        name: "",
+                        type: "",
+                        isActive: true,
+                        createdAt: null,
+                        _mode: "new",
+                        _selected: false,
+                        _orig: null
+                    });
+
+                    render();
+                } catch (err) {
+                    showAlert(alertHost, "danger", "Failed to load prefix rules: " + err.message);
+                }
             });
         }
 
@@ -587,6 +660,33 @@
             }
         });
 
+        tbody.addEventListener("change", (e) => {
+            const tr = e.target.closest("tr[data-index]");
+            if (!tr) return;
+
+            const index = Number(tr.getAttribute("data-index"));
+            if (Number.isNaN(index)) return;
+
+            const field = e.target.getAttribute("data-field");
+            if (!field) return;
+
+            if (field === "prefix") {
+                rows[index].prefix = e.target.value;
+
+                const selectedRule = prefixRules.find(r => r.prefix === e.target.value);
+                rows[index].type = selectedRule?.accountType || "";
+
+                render();
+                return;
+            }
+
+            if (field === "isActive") {
+                rows[index].isActive = e.target.checked;
+            } else {
+                rows[index][field] = e.target.value;
+            }
+        });
+
         load();
     }
 
@@ -638,11 +738,12 @@
         const btnCancelQuickAccount = document.querySelector('#btnCancelTxQuickAccount');
         const btnSaveQuickAccount = document.querySelector('#btnSaveTxQuickAccount');
 
-        const quickAccountCode = document.querySelector('#txQuickAccountCode');
-        const quickAccountName = document.querySelector('#txQuickAccountName');
-        const quickAccountType = document.querySelector('#txQuickAccountType');
+        const quickAccountPrefix = document.querySelector("#quickAccountPrefix");
+        const quickAccountName = document.querySelector("#quickAccountName");
+        const quickAccountTypePreview = document.querySelector("#quickAccountTypePreview");
 
         let transactions = [];
+        let accounts = [];
         let selectedIndex = null;
         let editingTxIndex = null;
         let txPage = 1;
@@ -651,6 +752,7 @@
         let detailPage = 1;
         let detailPageSize = 10;
         let pendingAccountLineIndex = null;
+        let quickAccountPrefixRules = [];
 
         // ---------- loading ----------
         async function loadAll() {
@@ -805,6 +907,30 @@
             } catch (err) {
                 console.warn("Failed to load accounts for dropdown", err);
             }
+        }
+
+        async function loadQuickAccountPrefixRules() {
+            if (quickAccountPrefixRules.length) return quickAccountPrefixRules;
+
+            quickAccountPrefixRules = await API.getAccountPrefixRulesForAccounts(companyId);
+
+            quickAccountPrefixRules = (quickAccountPrefixRules || []).map(r => ({
+                prefix: r.prefix ?? r.Prefix ?? "",
+                accountType: r.accountType ?? r.AccountType ?? ""
+            }));
+
+            if (quickAccountPrefix) {
+                quickAccountPrefix.innerHTML = `
+            <option value="">Select prefix...</option>
+            ${quickAccountPrefixRules.map(rule => `
+                <option value="${escapeHtml(rule.prefix)}">
+                    ${escapeHtml(rule.prefix)} - ${escapeHtml(rule.accountType)}
+                </option>
+            `).join("")}
+        `;
+            }
+
+            return quickAccountPrefixRules;
         }
 
         // ---------- master render ----------
@@ -1230,17 +1356,32 @@
             return max > 0 ? max + 1 : 1;
         }
 
-        function openQuickAccountModal(lineIndex) {
+        async function openQuickAccountModal(lineIndex) {
             pendingAccountLineIndex = lineIndex;
 
-            if (quickAccountCode) quickAccountCode.value = "";
-            if (quickAccountName) quickAccountName.value = "";
-            if (quickAccountType) quickAccountType.value = "";
+            try {
+                await loadQuickAccountPrefixRules();
 
-            quickAccountModal?.classList.remove("hidden");
-            quickAccountModal?.classList.add("flex");
+                if (!quickAccountPrefixRules.length) {
+                    alert("No prefix rules found. Please ask an admin to create prefix rules first.");
+                    pendingAccountLineIndex = null;
+                    return;
+                }
 
-            setTimeout(() => quickAccountCode?.focus(), 0);
+                if (quickAccountPrefix) quickAccountPrefix.value = "";
+                if (quickAccountName) quickAccountName.value = "";
+                if (quickAccountTypePreview) {
+                    quickAccountTypePreview.textContent = "Account type comes from selected prefix.";
+                }
+
+                quickAccountModal?.classList.remove("hidden");
+                quickAccountModal?.classList.add("flex");
+
+                setTimeout(() => quickAccountPrefix?.focus(), 0);
+            } catch (err) {
+                pendingAccountLineIndex = null;
+                alert(err.message || "Failed to load prefix rules.");
+            }
         }
 
         function closeQuickAccountModal() {
@@ -1250,64 +1391,49 @@
         }
 
         async function saveQuickAccountFromModal() {
-            const code = (quickAccountCode?.value || "").trim();
+            const prefix = (quickAccountPrefix?.value || "").trim().toUpperCase();
             const name = (quickAccountName?.value || "").trim();
-            const type = (quickAccountType?.value || "").trim();
 
-            if (!code) {
-                showAlert(alertHost, "danger", "Account code is required.");
-                quickAccountCode?.focus();
+            if (!prefix) {
+                alert("Prefix is required.");
+                quickAccountPrefix?.focus();
                 return;
             }
 
             if (!name) {
-                showAlert(alertHost, "danger", "Account name is required.");
+                alert("Account name is required.");
                 quickAccountName?.focus();
                 return;
             }
 
-            if (!type) {
-                showAlert(alertHost, "danger", "Account type is required.");
-                quickAccountType?.focus();
-                return;
-            }
-
             try {
-                const created = await API.createAccount(companyId, {
-                    accountCode: code,
+                const created = await API.createAccountFromPrefix(companyId, {
+                    prefix,
                     name,
-                    type,
                     isActive: true
                 });
 
-                const createdCode = created?.accountCode ?? created?.AccountCode ?? code;
-                const createdName = created?.name ?? created?.Name ?? name;
+                await loadAccounts();
 
-                const exists = accounts.some(a => a.code === createdCode);
-                if (!exists) {
-                    accounts.push({
-                        code: createdCode,
-                        name: createdName
-                    });
-
-                    accounts.sort((a, b) =>
-                        String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: "base" })
-                    );
-                }
-
-                if (selectedIndex != null && pendingAccountLineIndex != null) {
+                if (
+                    selectedIndex != null &&
+                    pendingAccountLineIndex != null &&
+                    created?.accountCode
+                ) {
                     const tx = transactions[selectedIndex];
-                    const line = tx?.entries?.[pendingAccountLineIndex];
+                    const line = tx?.entries[pendingAccountLineIndex];
+
                     if (line) {
-                        line.accountCode = createdCode;
+                        line.accountCode = created.accountCode;
                     }
                 }
 
                 closeQuickAccountModal();
                 renderDetail(selectedIndex);
-                showAlert(alertHost, "success", `Account ${createdCode} created.`);
+
+                showAlert(alertHost, "success", "Account created.");
             } catch (err) {
-                showAlert(alertHost, "danger", "Failed to create account: " + err.message);
+                alert(err.message || "Failed to create account.");
             }
         }
 
@@ -1446,7 +1572,6 @@
 
         // detail lines events
         if (linesBody) {
-
             function handleLineChange(e) {
                 const tr = e.target.closest("tr[data-line-index]");
                 if (!tr || selectedIndex == null) return;
@@ -1524,6 +1649,18 @@
         quickAccountModal?.addEventListener("click", (e) => {
             if (e.target === quickAccountModal) {
                 closeQuickAccountModal();
+            }
+        });
+
+        quickAccountPrefix?.addEventListener("change", () => {
+            const selectedPrefix = quickAccountPrefix.value;
+
+            const selectedRule = quickAccountPrefixRules.find(r => r.prefix === selectedPrefix);
+
+            if (quickAccountTypePreview) {
+                quickAccountTypePreview.textContent = selectedRule
+                    ? `Account type: ${selectedRule.accountType}`
+                    : "Account type comes from selected prefix.";
             }
         });
 
