@@ -16,14 +16,14 @@ namespace GLPack.Controllers
         [HttpPost]
         public async Task<ActionResult<CompanyDto>> Create([FromBody] CompanyUpsertDto dto, CancellationToken ct)
         {
-            var created = await _svc.CreateAsync(dto, ct);
+            CompanyDto created = await _svc.CreateAsync(dto, ct);
             return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
         }
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<CompanyDto>> Get(int id, CancellationToken ct)
         {
-            var item = await _svc.GetAsync(id, ct);
+            CompanyDto? item = await _svc.GetAsync(id, ct);
             return item is null ? NotFound() : Ok(item);
         }
 

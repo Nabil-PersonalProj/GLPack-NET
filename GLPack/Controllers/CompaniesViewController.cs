@@ -1,7 +1,8 @@
-﻿using AspNetCoreGeneratedDocument;
-using GLPack.DAL;
+﻿using GLPack.DAL;
+using GLPack.Models;
 using GLPack.Services;
 using GLPack.ViewModels.Companies;
+using GLPack.ViewModels.Reports;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,7 +27,7 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/dashboard")]
         public async Task<IActionResult> Dashboard(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
 
@@ -35,9 +36,9 @@ namespace GLPack.Controllers
                 return NotFound();
             }
 
-            var (tbRows, tbDr, tbCr) = await _reports.GetTrialBalanceAsync(company.Id, ct);
+            (List<TrialBalanceRow> tbRows, decimal tbDr, decimal tbCr) = await _reports.GetTrialBalanceAsync(company.Id, ct);
 
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name,
@@ -53,13 +54,13 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/accounts")]
         public async Task<IActionResult> Accounts(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
 
             if (company == null) return NotFound();
 
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name
@@ -71,13 +72,13 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/transactions")]
         public async Task<IActionResult> Transactions(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
 
             if (company == null) return NotFound();
 
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name
@@ -89,11 +90,11 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/search")]
         public async Task<IActionResult> Search(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
             if (company == null) return NotFound();
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name
@@ -106,7 +107,7 @@ namespace GLPack.Controllers
         {
             try
             {
-                var count = await _import.ImportCsvAsync(id, csvFile, ct);
+                int count = await _import.ImportCsvAsync(id, csvFile, ct);
                 TempData["ImportSuccess"] = $"Imported {count} lines.";
             }
             catch (Exception ex)

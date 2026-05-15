@@ -1,4 +1,5 @@
 ﻿using GLPack.DAL;
+using GLPack.Models;
 using GLPack.Services;
 using GLPack.ViewModels.Reports;
 using Microsoft.AspNetCore.Mvc;
@@ -22,17 +23,17 @@ namespace GLPack.Controllers
         [HttpGet("")]
         public async Task<IActionResult> Index(int companyId, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == companyId, ct);
 
             if (company == null) return NotFound();
 
-            var (tbRows, tbDr, tbCr) = await _reports.GetTrialBalanceAsync(companyId, ct);
-            var plRows = await _reports.GetProfitAndLossAsync(companyId, ct);
-            var bs = await _reports.GetBalanceSheetAsync(companyId, ct);
+            (List<TrialBalanceRow> tbRows, decimal tbDr, decimal tbCr) = await _reports.GetTrialBalanceAsync(companyId, ct);
+            List<ProfitLossRowVm> plRows = await _reports.GetProfitAndLossAsync(companyId, ct);
+            BalanceSheetVm bs = await _reports.GetBalanceSheetAsync(companyId, ct);
 
-            var vm = new ReportsIndexViewModel
+            ReportsIndexViewModel vm = new ReportsIndexViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name,
@@ -49,48 +50,48 @@ namespace GLPack.Controllers
         [HttpGet("trial-balance.csv")]
         public async Task<IActionResult> TrialBalanceCsv(int companyId, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == companyId, ct);
 
             if (company == null) return NotFound();
 
-            var csv = await _reports.GetTrialBalanceCsvAsync(companyId, ct);
-            var bytes = Encoding.UTF8.GetBytes(csv);
+            string csv = await _reports.GetTrialBalanceCsvAsync(companyId, ct);
+            byte[] bytes = Encoding.UTF8.GetBytes(csv);
 
-            var fileName = $"TrialBalance_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+            string fileName = $"TrialBalance_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
             return File(bytes, "text/csv", fileName);
         }
 
         [HttpGet("profit-loss.csv")]
         public async Task<IActionResult> ProfitLossCsv(int companyId, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == companyId, ct);
 
             if (company == null) return NotFound();
 
-            var csv = await _reports.GetProfitAndLossCsvAsync(companyId, ct);
-            var bytes = Encoding.UTF8.GetBytes(csv);
+            string csv = await _reports.GetProfitAndLossCsvAsync(companyId, ct);
+            byte[] bytes = Encoding.UTF8.GetBytes(csv);
 
-            var fileName = $"ProfitLoss_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+            string fileName = $"ProfitLoss_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
             return File(bytes, "text/csv", fileName);
         }
 
         [HttpGet("balance-sheet.csv")]
         public async Task<IActionResult> BalanceSheetCsv(int companyId, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == companyId, ct);
 
             if (company == null) return NotFound();
 
-            var csv = await _reports.GetBalanceSheetCsvAsync(companyId, ct);
-            var bytes = Encoding.UTF8.GetBytes(csv);
+            string csv = await _reports.GetBalanceSheetCsvAsync(companyId, ct);
+            byte[] bytes = Encoding.UTF8.GetBytes(csv);
 
-            var fileName = $"BalanceSheet_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+            string fileName = $"BalanceSheet_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
             return File(bytes, "text/csv", fileName);
         }
     }

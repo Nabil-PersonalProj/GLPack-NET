@@ -24,7 +24,7 @@ namespace GLPack.Controllers
         public async Task<ActionResult<IReadOnlyList<AdminPrefixRuleDto>>> GetPrefixRules(
         CancellationToken ct = default)
         {
-            var rules = await _db.AccountTypePrefixes
+            List<AdminPrefixRuleDto> rules = await _db.AccountTypePrefixes
                 .AsNoTracking()
                 .OrderBy(x => x.Prefix)
                 .Select(x => new AdminPrefixRuleDto
@@ -42,8 +42,8 @@ namespace GLPack.Controllers
             UpsertPrefixRuleRequest request,
             CancellationToken ct = default)
         {
-            var prefix = NormalizePrefix(request.Prefix);
-            var accountType = AccountTypes.Normalize(request.AccountType);
+            string prefix = NormalizePrefix(request.Prefix);
+            string accountType = AccountTypes.Normalize(request.AccountType);
 
             if (string.IsNullOrWhiteSpace(prefix))
                 return BadRequest("Prefix is required.");
@@ -51,13 +51,13 @@ namespace GLPack.Controllers
             if (string.IsNullOrWhiteSpace(accountType))
                 return BadRequest("Invalid account type.");
 
-            var exists = await _db.AccountTypePrefixes
+            bool exists = await _db.AccountTypePrefixes
                 .AnyAsync(x => x.Prefix == prefix, ct);
 
             if (exists)
                 return Conflict($"Prefix rule '{prefix}' already exists.");
 
-            var rule = new AccountTypePrefix
+            AccountTypePrefix rule = new AccountTypePrefix
             {
                 Prefix = prefix,
                 AccountType = accountType
@@ -81,8 +81,8 @@ namespace GLPack.Controllers
             UpsertPrefixRuleRequest request,
             CancellationToken ct = default)
         {
-            var normalizedPrefix = NormalizePrefix(prefix);
-            var accountType = AccountTypes.Normalize(request.AccountType);
+            string normalizedPrefix = NormalizePrefix(prefix);
+            string accountType = AccountTypes.Normalize(request.AccountType);
 
             if (string.IsNullOrWhiteSpace(normalizedPrefix))
                 return BadRequest("Prefix is required.");
@@ -90,7 +90,7 @@ namespace GLPack.Controllers
             if (string.IsNullOrWhiteSpace(accountType))
                 return BadRequest("Invalid account type.");
 
-            var rule = await _db.AccountTypePrefixes
+            AccountTypePrefix? rule = await _db.AccountTypePrefixes
                 .FirstOrDefaultAsync(x => x.Prefix == normalizedPrefix, ct);
 
             if (rule is null)
@@ -112,9 +112,9 @@ namespace GLPack.Controllers
             string prefix,
             CancellationToken ct = default)
         {
-            var normalizedPrefix = NormalizePrefix(prefix);
+            string normalizedPrefix = NormalizePrefix(prefix);
 
-            var rule = await _db.AccountTypePrefixes
+            AccountTypePrefix? rule = await _db.AccountTypePrefixes
                 .FirstOrDefaultAsync(x => x.Prefix == normalizedPrefix, ct);
 
             if (rule is null)

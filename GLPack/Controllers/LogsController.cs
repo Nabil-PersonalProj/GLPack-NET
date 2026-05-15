@@ -1,5 +1,6 @@
 ﻿using GLPack.Contracts;
 using GLPack.DAL;
+using GLPack.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,11 +31,11 @@ namespace GLPack.Controllers
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 10, 200);
 
-            var query = _db.AppLogs.AsNoTracking();
+            IQueryable<AppLog> query = _db.AppLogs.AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(level))
             {
-                var levelValue = level.Trim();
+                string levelValue = level.Trim();
 
                 query = query.Where(x =>
                     x.Level.ToLower() == levelValue.ToLower());
@@ -42,7 +43,7 @@ namespace GLPack.Controllers
 
             if (!string.IsNullOrWhiteSpace(eventType))
             {
-                var eventTypeValue = eventType.Trim();
+                string eventTypeValue = eventType.Trim();
 
                 query = query.Where(x =>
                     x.EventType.ToLower().Contains(eventTypeValue.ToLower()));
@@ -50,7 +51,7 @@ namespace GLPack.Controllers
 
             if (!string.IsNullOrWhiteSpace(q))
             {
-                var search = q.Trim().ToLower();
+                string search = q.Trim().ToLower();
 
                 query = query.Where(x =>
                     x.LogCode.ToLower().Contains(search) ||
@@ -61,9 +62,9 @@ namespace GLPack.Controllers
                     x.Level.ToLower().Contains(search));
             }
 
-            var totalCount = await query.CountAsync(ct);
+            int totalCount = await query.CountAsync(ct);
 
-            var items = await query
+            List<AdminLogDto> items = await query
                 .OrderByDescending(x => x.TsUtc)
                 .ThenByDescending(x => x.Id)
                 .Skip((page - 1) * pageSize)

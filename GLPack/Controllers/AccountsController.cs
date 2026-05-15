@@ -23,7 +23,7 @@ namespace GLPack.Controllers
         public async Task<ActionResult<PagedResult<AccountDto>>> List(
             int companyId, string? q, int page = 1, int pageSize = 10, CancellationToken ct = default)
         {
-            var result = await _svc.ListAsync(companyId, q, page, pageSize, ct);
+            PagedResult<AccountDto> result = await _svc.ListAsync(companyId, q, page, pageSize, ct); = await _svc.ListAsync(companyId, q, page, pageSize, ct);
             return Ok(result);
         }
 
@@ -41,7 +41,7 @@ namespace GLPack.Controllers
 
             try
             {
-                var created = await _svc.CreateAsync(dto, ct);
+                AccountDto created = await _svc.CreateAsync(dto, ct);
                 return CreatedAtAction(nameof(Get), new { companyId, accountCode = created.AccountCode }, created);
             }
             catch (InvalidOperationException ex)
@@ -84,7 +84,7 @@ namespace GLPack.Controllers
 
             try
             {
-                var created = await _svc.CreateFromPrefixAsync(dto, ct);
+                AccountDto created = await _svc.CreateFromPrefixAsync(dto, ct);
 
                 return CreatedAtAction(
                     nameof(Get),
@@ -100,7 +100,7 @@ namespace GLPack.Controllers
         [HttpGet("prefix-rules")]
         public async Task<ActionResult<IReadOnlyList<AdminPrefixRuleDto>>> GetPrefixRules(int companyId, CancellationToken ct)
         {
-            var rules = await _db.AccountTypePrefixes
+            List<AdminPrefixRuleDto> rules = await _db.AccountTypePrefixes
                 .AsNoTracking()
                 .OrderBy(x => x.Prefix)
                 .Select(x => new AdminPrefixRuleDto

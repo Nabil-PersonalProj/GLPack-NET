@@ -29,7 +29,7 @@ namespace GLPack.Controllers
         public async Task<ActionResult<IReadOnlyList<AdminUserDto>>> GetUsers(
             CancellationToken ct = default)
         {
-            var users = await _db.AppUsers
+            List<AdminUserDto> users = await _db.AppUsers
                 .AsNoTracking()
                 .OrderBy(x => x.Email)
                 .Select(x => new AdminUserDto
@@ -51,7 +51,7 @@ namespace GLPack.Controllers
             CreateAdminUserRequest request,
             CancellationToken ct = default)
         {
-            var email = NormalizeEmail(request.Email);
+            string email = NormalizeEmail(request.Email);
 
             if (string.IsNullOrWhiteSpace(email))
                 return BadRequest("Email is required.");
@@ -62,12 +62,12 @@ namespace GLPack.Controllers
             if (request.Password.Length < 6)
                 return BadRequest("Password must be at least 6 characters.");
 
-            var exists = await _db.AppUsers.AnyAsync(x => x.Email == email, ct);
+            bool exists = await _db.AppUsers.AnyAsync(x => x.Email == email, ct);
 
             if (exists)
                 return Conflict($"User '{email}' already exists.");
 
-            var user = new AppUser
+            AppUser user = new AppUser
             {
                 Email = email,
                 IsAdmin = request.IsAdmin,
@@ -130,18 +130,18 @@ namespace GLPack.Controllers
             UpdateAdminUserRequest request,
             CancellationToken ct = default)
         {
-            var currentUserId = GetCurrentUserId();
-            var email = NormalizeEmail(request.Email);
+            int? currentUserId = GetCurrentUserId();
+            string email = NormalizeEmail(request.Email);
 
             if (string.IsNullOrWhiteSpace(email))
                 return BadRequest("Email is required.");
 
-            var user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
+            AppUser? user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (user is null)
                 return NotFound("User was not found.");
 
-            var emailTaken = await _db.AppUsers
+            bool emailTaken = await _db.AppUsers
                 .AnyAsync(x => x.Id != id && x.Email == email, ct);
 
             if (emailTaken)
@@ -190,7 +190,7 @@ namespace GLPack.Controllers
                         eventType: "ERROR",
                         level: "ERROR",
                         logCode: "ADMIN_USER_UPDATE_FAILED",
-                        logMessage: $"Failed to updateuser {email}. Error: {ex.Message}",
+                        logMessage: $"Failed to update user {email}. Error: {ex.Message}",
                         companyId: null,
                         sourceFile: nameof(AdminUserController),
                         sourceFunction: nameof(UpdateUser),
@@ -218,7 +218,7 @@ namespace GLPack.Controllers
             if (request.Password.Length < 6)
                 return BadRequest("Password must be at least 6 characters.");
 
-            var user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
+            AppUser? user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (user is null)
                 return NotFound("User was not found.");
@@ -276,12 +276,12 @@ namespace GLPack.Controllers
             int id,
             CancellationToken ct = default)
         {
-            var currentUserId = GetCurrentUserId();
+            int? currentUserId = GetCurrentUserId();
 
             if (currentUserId == id)
                 return BadRequest("You cannot delete your own account.");
 
-            var user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
+            AppUser? user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (user is null)
                 return NotFound("User was not found.");
@@ -299,7 +299,7 @@ namespace GLPack.Controllers
                         logMessage: $"Admin delete user {user.Email}.",
                         companyId: null,
                         sourceFile: nameof(AdminUserController),
-                        sourceFunction: nameof(CreateUser),
+                        sourceFunction: nameof(DeleteUser),
                         ct: ct);
                 }
                 catch
@@ -320,7 +320,7 @@ namespace GLPack.Controllers
                         logMessage: $"Failed to delete user {user.Email}. Error: {ex.Message}",
                         companyId: null,
                         sourceFile: nameof(AdminUserController),
-                        sourceFunction: nameof(CreateUser),
+                        sourceFunction: nameof(DeleteUser),
                         ct: ct);
                 }
                 catch
@@ -335,7 +335,7 @@ namespace GLPack.Controllers
 
         private int? GetCurrentUserId()
         {
-            var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            string? raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             if (int.TryParse(raw, out var id))
                 return id;

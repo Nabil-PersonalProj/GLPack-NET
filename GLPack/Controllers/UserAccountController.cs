@@ -38,7 +38,7 @@ namespace GLPack.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            var user = await _db.AppUsers
+            AppUser? user = await _db.AppUsers
                 .SingleOrDefaultAsync(u => u.Email == model.Email && u.IsActive, ct);
 
             if (user == null || string.IsNullOrEmpty(user.PasswordHash))
@@ -47,7 +47,7 @@ namespace GLPack.Controllers
                 return View(model);
             }
 
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, model.Password);
+            PasswordVerificationResult result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, model.Password);
             if (result == PasswordVerificationResult.Failed)
             {
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
@@ -57,15 +57,15 @@ namespace GLPack.Controllers
             user.LastLoginAtUtc = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
 
-            var claims = new List<Claim>
+            List<Claim> claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Email),
                 new Claim("IsAdmin", user.IsAdmin ? "True" : "False")
             };
 
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
+            ClaimsIdentity identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            ClaimsPrincipal principal = new ClaimsPrincipal(identity);
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
@@ -91,7 +91,7 @@ namespace GLPack.Controllers
         [HttpPost]
         public async Task<IActionResult> Logout(CancellationToken ct)
         {
-            var email = User.Identity?.Name ?? "(unknown)";
+            string email = User.Identity?.Name ?? "(unknown)";
 
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
