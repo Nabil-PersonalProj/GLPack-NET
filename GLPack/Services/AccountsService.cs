@@ -182,6 +182,37 @@ namespace GLPack.Services
             };
 
             _db.Accounts.Add(entity);
+
+            if (prefix == "FA")
+            {
+                var numberPart = nextCode[prefix.Length..];
+                var pdCode = $"PD{numberPart}";
+
+                var pdExists = await _db.Accounts.AnyAsync(
+                    x => x.CompanyId == dto.CompanyId && x.Code == pdCode,
+                    ct);
+
+                if (pdExists)
+                    throw new InvalidOperationException($"Linked depreciation account '{pdCode}' already exists.");
+
+                var pdPrefixRule = await _db.AccountTypePrefixes
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Prefix == "PD", ct);
+
+                if (pdPrefixRule is null)
+                    throw new InvalidOperationException("PD prefix rule was not found.");
+
+                var entityPD = new Account
+                {
+                    CompanyId = dto.CompanyId,
+                    Code = pdCode,
+                    Name = $"{name} - {nextCode}",
+                    Type = pdPrefixRule.AccountType
+                };
+
+                _db.Accounts.Add(entityPD);
+            }
+
             await _db.SaveChangesAsync(ct);
 
             await _appLogger.LogAsync(

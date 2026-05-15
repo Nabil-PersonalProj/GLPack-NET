@@ -497,6 +497,8 @@
                     const normalized = normalizeAccount(created || dto);
                     rows[index] = Object.assign(normalized, { _mode: "view", _selected: true });
                     showAlert(alertHost, "success", "Account created.");
+                    await load();
+                    return;
                 } else {
                     const originalCode = row._orig?.accountCode || row.accountCode;
                     const updated = await API.updateAccount(companyId, originalCode, dto);

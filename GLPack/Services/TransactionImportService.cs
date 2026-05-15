@@ -1,9 +1,8 @@
-﻿using System.Globalization;
-using System.Text;
-using GLPack.DAL;
+﻿using GLPack.DAL;
 using GLPack.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
 
 namespace GLPack.Services
 {
@@ -181,7 +180,7 @@ namespace GLPack.Services
             {
                 if (string.IsNullOrWhiteSpace(line))
                 {
-                    continue; 
+                    continue;
                 }
 
                 var cols = SplitCsvLine(line);
@@ -192,7 +191,7 @@ namespace GLPack.Services
                 // fixed positions
                 var dateStr = cols[0].Trim();
                 var trxNo = cols[1].Trim();
-                var ledger = cols[2].Trim();
+                var ledger = NormalizeImportedAccountCode(cols[2]);
                 var particular = cols[3].Trim();
                 var drStr = cols[4].Trim();
                 var crStr = cols[5].Trim();
@@ -261,6 +260,32 @@ namespace GLPack.Services
 
             cols.Add(sb.ToString());
             return cols;
+        }
+
+        private static string NormalizeImportedAccountCode(string? accountCode)
+        {
+            var code = (accountCode ?? "").Trim().ToUpperInvariant();
+
+            if (string.IsNullOrWhiteSpace(code))
+                return "";
+
+            var splitIndex = code.Length;
+
+            while (splitIndex > 0 && char.IsDigit(code[splitIndex - 1]))
+            {
+                splitIndex--;
+            }
+
+            var prefix = code[..splitIndex];
+            var numberPart = code[splitIndex..];
+
+            if (string.IsNullOrWhiteSpace(prefix) || string.IsNullOrWhiteSpace(numberPart))
+                return code;
+
+            if (!int.TryParse(numberPart, out var number))
+                return code;
+
+            return $"{prefix}{number:000}";
         }
 
         private static string ResolveAccountType(string accountCode, List<AccountTypePrefix> prefixRules)
