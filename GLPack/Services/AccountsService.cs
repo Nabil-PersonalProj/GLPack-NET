@@ -67,54 +67,6 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<AccountDto> CreateAsync(AccountUpsertDto dto, CancellationToken ct)
-        {
-            // Enforce unique (CompanyId, Code)
-            var exists = await _db.Accounts.AnyAsync(a => a.CompanyId == dto.CompanyId && a.Code == dto.AccountCode, ct);
-            if (exists)
-            {
-                await _appLogger.LogAsync(
-                    eventType: "ERROR",
-                    level: "WARN",
-                    logCode: "ACCOUNTS_CODE_DUP",
-                    logMessage: $"AccountCode '{dto.AccountCode}' already exists",
-                    companyId: dto.CompanyId,
-                    sourceFile: nameof(AccountsService),
-                    sourceFunction: nameof(CreateAsync),
-                    ct: ct);
-                throw new InvalidOperationException("AccountCode already exists for this company.");
-            }
-
-            var entity = new Account
-            {
-                CompanyId = dto.CompanyId,
-                Code = dto.AccountCode,
-                Name = dto.Name,
-                Type = dto.Type
-            };
-
-            _db.Accounts.Add(entity);
-            await _db.SaveChangesAsync(ct);
-            await _appLogger.LogAsync(
-                eventType: "AUDIT",
-                level: "INFO",
-                logCode: "ACCOUNTS_CREATE_OK",
-                logMessage: $"Created account {entity.Code}",
-                companyId: entity.CompanyId,
-                sourceFile: nameof(AccountsService),
-                sourceFunction: nameof(CreateAsync),
-                ct: ct);
-
-            return new AccountDto
-            {
-                Id = entity.Id,
-                CompanyId = entity.CompanyId,
-                AccountCode = entity.Code,
-                Name = entity.Name,
-                Type = entity.Type
-            };
-        }
-
         public async Task UpdateAsync(int companyId, string accountCode, AccountUpsertDto dto, CancellationToken ct)
         {
             var a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);

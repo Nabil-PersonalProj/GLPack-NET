@@ -80,13 +80,6 @@
         return request(`/api/companies/${companyId}/accounts?` + params.toString());
     }
 
-    function createAccount(companyId, dto) {
-        return request(`/api/companies/${companyId}/accounts`, {
-            method: "POST",
-            body: Object.assign({ companyId }, dto)
-        });
-    }
-
     function createAccountFromPrefix(companyId, dto) {
         return request(`/api/companies/${companyId}/accounts/from-prefix`, {
             method: "POST",
@@ -266,7 +259,6 @@
         deleteCompany,
         companyDashboardUrl,
         getAccounts,
-        createAccount,
         createAccountFromPrefix,
         updateAccount,
         deleteAccount,

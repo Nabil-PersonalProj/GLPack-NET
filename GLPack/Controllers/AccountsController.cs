@@ -34,22 +34,6 @@ namespace GLPack.Controllers
             return item is null ? NotFound() : Ok(item);
         }
 
-        [HttpPost]
-        public async Task<ActionResult<AccountDto>> Create(int companyId, [FromBody] AccountUpsertDto dto, CancellationToken ct)
-        {
-            if (dto.CompanyId != companyId) return BadRequest("Mismatched companyId.");
-
-            try
-            {
-                AccountDto created = await _svc.CreateAsync(dto, ct);
-                return CreatedAtAction(nameof(Get), new { companyId, accountCode = created.AccountCode }, created);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return ValidationProblem(detail: ex.Message);
-            }
-        }
-
         [HttpPut("{accountCode}")]
         public async Task<IActionResult> Update(int companyId, string accountCode, [FromBody] AccountUpsertDto dto, CancellationToken ct)
         {
