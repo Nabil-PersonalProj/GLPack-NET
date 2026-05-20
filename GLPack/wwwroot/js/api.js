@@ -28,7 +28,13 @@
             } catch { /* ignore parse error */ }
 
             const message =
-                (payload && (payload.message || payload.error)) ||
+                (payload && (
+                    payload.message ||
+                    payload.error ||
+                    payload.detail ||
+                    extractModelStateErrors(payload.errors) ||
+                    payload.title
+                )) ||
                 (typeof payload === "string" ? payload : res.statusText);
 
             const err = new Error(message || `HTTP ${res.status}`);
@@ -41,6 +47,24 @@
             return res.json();
         }
         return res.text();
+    }
+
+    function extractModelStateErrors(errors) {
+        if (!errors) return null;
+
+        const messages = [];
+
+        for (const key of Object.keys(errors)) {
+            const value = errors[key];
+
+            if (Array.isArray(value)) {
+                messages.push(...value);
+            } else if (typeof value === "string") {
+                messages.push(value);
+            }
+        }
+
+        return messages.length ? messages.join(" ") : null;
     }
 
     // ----- Companies API -----

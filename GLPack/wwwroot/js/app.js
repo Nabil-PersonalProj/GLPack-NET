@@ -2528,11 +2528,34 @@
     // ---------- helpers ----------
     function showAlert(host, type, msg) {
         if (!host) return;
-        const div = document.createElement("div");
-        div.className = `alert ${type === "success" ? "alert-success" : "alert-danger"}`;
-        div.textContent = msg;
-        host.appendChild(div);
-        setTimeout(() => div.remove(), 4000);
+
+        if (host._alertTimer) {
+            clearTimeout(host._alertTimer);
+        }
+
+        const existingMessages = new Set(
+            Array.from(host.querySelectorAll("[data-alert-message]"))
+                .map(x => x.dataset.alertMessage)
+        );
+
+        if (!existingMessages.has(msg)) {
+            const div = document.createElement("div");
+
+            div.className =
+                type === "success"
+                    ? "pointer-events-auto rounded-lg border border-green-700 bg-green-950 px-3 py-2 text-xs text-green-100 shadow-lg"
+                    : "pointer-events-auto rounded-lg border border-red-700 bg-red-950 px-3 py-2 text-xs text-red-100 shadow-lg";
+
+            div.dataset.alertMessage = msg;
+            div.textContent = msg;
+
+            host.appendChild(div);
+        }
+
+        host._alertTimer = setTimeout(() => {
+            host.innerHTML = "";
+            host._alertTimer = null;
+        }, 4000);
     }
 
     function formatDate(value) {
