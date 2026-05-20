@@ -9,7 +9,7 @@ namespace GLPack.Services
     {
         public static async Task SeedDefaultUsersAsync(ApplicationDbContext db)
         {
-            var hasher = new PasswordHasher<AppUser>();
+            PasswordHasher<AppUser> hasher = new PasswordHasher<AppUser>();
 
             await EnsureUserAsync(db, hasher,
                 email: "muhammadnabil.hakeem@gmail.com",
@@ -32,10 +32,10 @@ namespace GLPack.Services
             bool isAdmin,
             bool isActive)
         {
-            var existing = await db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
+            AppUser? existing = await db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
             if (existing != null) return;
 
-            var user = new AppUser
+            AppUser user = new AppUser
             {
                 Email = email,
                 IsAdmin = isAdmin,

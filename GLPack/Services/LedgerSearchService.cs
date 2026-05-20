@@ -50,7 +50,7 @@ namespace GLPack.Services
 
             if (q is not null)
             {
-                var qIsInt = int.TryParse(q, out var qInt);
+                bool qIsInt = int.TryParse(q, out int qInt);
 
                 query = query.Where(x =>
                     (qIsInt && x.t.TransactionNo == qInt) ||
@@ -70,7 +70,7 @@ namespace GLPack.Services
                 .ThenBy(x => x.a.Code);
 
             // Page + shape DTO
-            var rows = await query
+            List<LedgerRowDto> rows = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new LedgerRowDto

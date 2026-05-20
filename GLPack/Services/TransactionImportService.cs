@@ -1,6 +1,7 @@
 ﻿using GLPack.DAL;
 using GLPack.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using System.Globalization;
 using System.Text;
 
@@ -41,41 +42,41 @@ namespace GLPack.Services
                 throw new ArgumentException("No CSV file uploaded.");
             }
 
-            var rows = await ReadCsvRowsAsync(csvFile, ct);
+            List<CsvRow> rows = await ReadCsvRowsAsync(csvFile, ct);
             if (rows.Count == 0)
                 return 0;
 
             // Ensure company exists (cheap guard)
-            var companyExists = await _db.Companies.AnyAsync(c => c.Id == companyId, ct);
+            bool companyExists = await _db.Companies.AnyAsync(c => c.Id == companyId, ct);
             if (!companyExists)
                 throw new KeyNotFoundException("Company not found.");
 
             // 1) Ensure accounts exist
-            var codes = rows
+            string[] codes = rows
                 .Select(r => r.AccountCode)
                 .Where(c => !string.IsNullOrWhiteSpace(c))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            var existing = await _db.Accounts
+            List<string> existing = await _db.Accounts
                 .Where(a => a.CompanyId == companyId && codes.Contains(a.Code))
                 .Select(a => a.Code)
                 .ToListAsync(ct);
 
-            var missing = codes
+            string[] missing = codes
                 .Except(existing, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
             if (missing.Length > 0)
             {
-                var prefixRules = await _db.AccountTypePrefixes
+                List<AccountTypePrefix> prefixRules = await _db.AccountTypePrefixes
                    .AsNoTracking()
                    .ToListAsync(ct);
 
-                foreach (var code in missing)
+                foreach (string code in missing)
                 {
-                    var trimmedCode = code.Trim();
-                    var accountType = ResolveAccountType(trimmedCode, prefixRules);
+                    string trimmedCode = code.Trim();
+                    string accountType = ResolveAccountType(trimmedCode, prefixRules);
 
                     _db.Accounts.Add(new Account
                     {
@@ -91,7 +92,7 @@ namespace GLPack.Services
             }
 
             // 2) Allocate new TransactionNos
-            var maxTxnNo = await _db.Transactions
+            int maxTxnNo = await _db.Transactions
                 .Where(t => t.CompanyId == companyId)
                 .Select(t => (int?)t.TransactionNo)
                 .MaxAsync(ct) ?? 0;
@@ -101,26 +102,26 @@ namespace GLPack.Services
             static string Key(DateTime utcDate, string sourceNo)
                 => $"{utcDate:yyyy-MM-dd}|{sourceNo}";
 
-            var orderedDistinctKeys = rows
+            List<string> orderedDistinctKeys = rows
                 .Select(r => Key(r.DateUtc, r.SourceTrxNo))
                 .Distinct()
                 .ToList();
 
-            var map = new Dictionary<string, int>(StringComparer.Ordinal);
-            var next = maxTxnNo + 1;
-            foreach (var k in orderedDistinctKeys)
+            Dictionary<string, int> map = new Dictionary<string, int>(StringComparer.Ordinal);
+            int next = maxTxnNo + 1;
+            foreach (string k in orderedDistinctKeys)
                 map[k] = next++;
 
             // 3) Insert headers + lines
-            await using var dbTx = await _db.Database.BeginTransactionAsync(ct);
+            await using IDbContextTransaction dbTx = await _db.Database.BeginTransactionAsync(ct);
 
             // Create headers (one per distinct key)
-            var headers = new List<Transaction>(orderedDistinctKeys.Count);
-            foreach (var k in orderedDistinctKeys)
+            List<Transaction> headers = new List<Transaction>(orderedDistinctKeys.Count);
+            foreach (string k in orderedDistinctKeys)
             {
                 // Parse date back out of key (first segment) - safe because we made it.
-                var datePart = k.Split('|', 2)[0];
-                var dt = DateTime.ParseExact(datePart, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+                string datePart = k.Split('|', 2)[0];
+                DateTime dt = DateTime.ParseExact(datePart, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
                 dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
 
                 headers.Add(new Transaction
@@ -136,10 +137,10 @@ namespace GLPack.Services
             await _db.SaveChangesAsync(ct);
 
             // Create lines
-            var lines = new List<TransactionEntry>(rows.Count);
-            foreach (var r in rows)
+            List<TransactionEntry> lines = new List<TransactionEntry>(rows.Count);
+            foreach (CsvRow r in rows)
             {
-                var k = Key(r.DateUtc, r.SourceTrxNo);
+                string k = Key(r.DateUtc, r.SourceTrxNo);
                 lines.Add(new TransactionEntry
                 {
                     CompanyId = companyId,
@@ -170,10 +171,10 @@ namespace GLPack.Services
 
         private async Task<List<CsvRow>> ReadCsvRowsAsync(IFormFile csvFile, CancellationToken ct)
         {
-            var result = new List<CsvRow>();
+            List<CsvRow> result = new List<CsvRow>();
 
-            await using var stream = csvFile.OpenReadStream();
-            using var reader = new StreamReader(stream);
+            await using Stream stream = csvFile.OpenReadStream();
+            using StreamReader reader = new StreamReader(stream);
 
             string? line;
             while ((line = await reader.ReadLineAsync(ct)) != null)
@@ -183,34 +184,34 @@ namespace GLPack.Services
                     continue;
                 }
 
-                var cols = SplitCsvLine(line);
+                List<string> cols = SplitCsvLine(line);
                 if (cols.Count < 6)
                 {
                     continue;
                 }
                 // fixed positions
-                var dateStr = cols[0].Trim();
-                var trxNo = cols[1].Trim();
-                var ledger = NormalizeImportedAccountCode(cols[2]);
-                var particular = cols[3].Trim();
-                var drStr = cols[4].Trim();
-                var crStr = cols[5].Trim();
+                string dateStr = cols[0].Trim();
+                string trxNo = cols[1].Trim();
+                string ledger = NormalizeImportedAccountCode(cols[2]);
+                string particular = cols[3].Trim();
+                string drStr = cols[4].Trim();
+                string crStr = cols[5].Trim();
 
-                var dateFormats = new[] { "dd/MM/yy", "dd/MM/yyyy" };
+                string[] dateFormats = new[] { "dd/MM/yy", "dd/MM/yyyy" };
                 if (!DateTime.TryParseExact(
                     dateStr,
                     dateFormats,
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.None,
-                    out var dt))
+                    out DateTime dt))
                 {
                     continue;
                 }
 
                 dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
 
-                var dr = string.IsNullOrWhiteSpace(drStr) ? 0m : decimal.Parse(drStr, NumberStyles.Any, CultureInfo.InvariantCulture);
-                var cr = string.IsNullOrWhiteSpace(crStr) ? 0m : decimal.Parse(crStr, NumberStyles.Any, CultureInfo.InvariantCulture);
+                decimal dr = string.IsNullOrWhiteSpace(drStr) ? 0m : decimal.Parse(drStr, NumberStyles.Any, CultureInfo.InvariantCulture);
+                decimal cr = string.IsNullOrWhiteSpace(crStr) ? 0m : decimal.Parse(crStr, NumberStyles.Any, CultureInfo.InvariantCulture);
 
                 result.Add(new CsvRow(
                     DateUtc: dt,
@@ -226,13 +227,13 @@ namespace GLPack.Services
 
         private static List<string> SplitCsvLine(string line)
         {
-            var cols = new List<string>();
-            var sb = new StringBuilder();
-            var inQuotes = false;
+            List<string> cols = new List<string>();
+            StringBuilder sb = new StringBuilder();
+            bool inQuotes = false;
 
-            for (var i = 0; i < line.Length; i++)
+            for (int i = 0; i < line.Length; i++)
             {
-                var ch = line[i];
+                char ch = line[i];
 
                 if (ch == '"')
                 {
@@ -264,25 +265,25 @@ namespace GLPack.Services
 
         private static string NormalizeImportedAccountCode(string? accountCode)
         {
-            var code = (accountCode ?? "").Trim().ToUpperInvariant();
+            string code = (accountCode ?? "").Trim().ToUpperInvariant();
 
             if (string.IsNullOrWhiteSpace(code))
                 return "";
 
-            var splitIndex = code.Length;
+            int splitIndex = code.Length;
 
             while (splitIndex > 0 && char.IsDigit(code[splitIndex - 1]))
             {
                 splitIndex--;
             }
 
-            var prefix = code[..splitIndex];
-            var numberPart = code[splitIndex..];
+            string prefix = code[..splitIndex];
+            string numberPart = code[splitIndex..];
 
             if (string.IsNullOrWhiteSpace(prefix) || string.IsNullOrWhiteSpace(numberPart))
                 return code;
 
-            if (!int.TryParse(numberPart, out var number))
+            if (!int.TryParse(numberPart, out int number))
                 return code;
 
             return $"{prefix}{number:000}";
@@ -293,9 +294,9 @@ namespace GLPack.Services
             if (string.IsNullOrWhiteSpace(accountCode))
                 return "Uncategorized";
 
-            var code = accountCode.Trim().ToUpperInvariant();
+            string code = accountCode.Trim().ToUpperInvariant();
 
-            var match = prefixRules
+            AccountTypePrefix? match = prefixRules
                 .OrderByDescending(x => x.Prefix.Length)
                 .FirstOrDefault(x => code.StartsWith(x.Prefix.ToUpperInvariant()));
 

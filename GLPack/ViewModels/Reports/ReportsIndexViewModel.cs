@@ -76,4 +76,15 @@
         public string AccountType { get; set; } = string.Empty;
         public decimal Amount { get; set; }
     }
+
+    public sealed class AccountReportTotal
+    {
+        public string AccountCode { get; set; } = string.Empty;
+        public string AccountName { get; set; } = string.Empty;
+        public string AccountType { get; set; } = string.Empty;
+        public decimal TotalDebit { get; set; }
+        public decimal TotalCredit { get; set; }
+    }
+
+
 }

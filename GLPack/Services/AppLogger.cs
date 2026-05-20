@@ -33,7 +33,7 @@ namespace GLPack.Services
                 ct: ct
                 );
              * */
-            var row = new AppLog
+            AppLog row = new AppLog
             {
                 TsUtc = DateTime.UtcNow,
                 CompanyId = companyId,

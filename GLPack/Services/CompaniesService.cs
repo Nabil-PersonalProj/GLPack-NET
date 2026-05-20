@@ -18,7 +18,7 @@ namespace GLPack.Services
 
         public async Task<CompanyDto> CreateAsync(CompanyUpsertDto dto, CancellationToken ct)
         {
-            var entity = new Company { Name = dto.Name };
+            Company entity = new Company { Name = dto.Name };
             _db.Companies.Add(entity);
             await _db.SaveChangesAsync(ct);
             await _appLogger.LogAsync(
@@ -35,13 +35,13 @@ namespace GLPack.Services
 
         public async Task<CompanyDto?> GetAsync(int id, CancellationToken ct)
         {
-            var c = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            Company? c = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
             return c is null ? null : new CompanyDto { Id = c.Id, Name = c.Name };
         }
 
         public async Task<IReadOnlyList<CompanyDto>> ListAsync(string? q, int page, int pageSize, CancellationToken ct)
         {
-            var query = _db.Companies.AsNoTracking();
+            IQueryable<Company> query = _db.Companies.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(q)) query = query.Where(c => c.Name.Contains(q));
             return await query
                 .OrderBy(c => c.Name)
@@ -52,7 +52,7 @@ namespace GLPack.Services
 
         public async Task UpdateAsync(int id, CompanyUpsertDto dto, CancellationToken ct)
         {
-            var c = await _db.Companies.FirstOrDefaultAsync(x => x.Id == id, ct);
+            Company? c = await _db.Companies.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (c is null) throw new KeyNotFoundException("Company not found.");
             c.Name = dto.Name;
             await _db.SaveChangesAsync(ct);
@@ -69,7 +69,7 @@ namespace GLPack.Services
 
         public async Task DeleteAsync(int id, CancellationToken ct)
         {
-            var c = await _db.Companies.Include(x => x.Accounts).Include(x => x.Transactions)
+            Company? c = await _db.Companies.Include(x => x.Accounts).Include(x => x.Transactions)
                 .FirstOrDefaultAsync(x => x.Id == id, ct);
             if (c is null) return;
 
@@ -102,11 +102,11 @@ namespace GLPack.Services
 
         public async Task<IReadOnlyList<CompanyQuickPick>> GetQuickPicksAsync(string? search, int take = 24, CancellationToken ct = default)
         {
-            var q = _db.Companies.AsNoTracking();
+            IQueryable<Company> q = _db.Companies.AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var s = search.Trim();
+                string s = search.Trim();
                 q = q.Where(c =>
                     EF.Functions.ILike(c.Name, $"%{s}%"));
             }
