@@ -72,8 +72,8 @@ namespace GLPack.Controllers
 
             try
             {
-                await _svc.UpdateAsync(companyId, transactionNo, dto, ct);
-                return NoContent();
+                Tx.TransactionDto updated = await _svc.UpdateAsync(companyId, transactionNo, dto, ct);
+                return Ok(updated);
             }
             catch (KeyNotFoundException)
             {

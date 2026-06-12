@@ -19,6 +19,7 @@ namespace GLPack.DAL.Config
             b.Property(x => x.LineDescription).HasMaxLength(500);
             b.Property(x => x.Debit).HasColumnName("debit").HasColumnType("numeric(18,2)");
             b.Property(x => x.Credit).HasColumnName("credit").HasColumnType("numeric(18,2)");
+            b.Property(x => x.HasError).HasColumnName("has_error").HasDefaultValue(false);
 
             // (CompanyId, TransactionNo) -> Transaction(CompanyId, TransactionNo)
             b.HasOne(x => x.Transaction)

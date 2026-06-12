@@ -83,7 +83,8 @@ namespace GLPack.Services
                 AccountCode = e.AccountCode,
                 LineDescription = e.Memo,
                 Debit = e.Debit,
-                Credit = e.Credit
+                Credit = e.Credit,
+                HasError = IsZeroZeroEntry(e.Debit, e.Credit)
             }).ToList();
 
             _db.TransactionEntries.AddRange(lines);
@@ -112,7 +113,8 @@ namespace GLPack.Services
                     AccountCode = l.AccountCode,
                     Debit = l.Debit,
                     Credit = l.Credit,
-                    Memo = l.LineDescription
+                    Memo = l.LineDescription,
+                    HasError = l.HasError || IsZeroZeroEntry(l.Debit, l.Credit)
                 }).ToList()
             };
         }
@@ -131,7 +133,8 @@ namespace GLPack.Services
                     AccountCode = l.AccountCode,
                     Debit = l.Debit,
                     Credit = l.Credit,
-                    Memo = l.LineDescription
+                    Memo = l.LineDescription,
+                    HasError = l.HasError || IsZeroZeroEntry(l.Debit, l.Credit)
                 })
                 .ToListAsync(ct);
 
@@ -184,7 +187,11 @@ namespace GLPack.Services
             int total = await query.CountAsync(ct);
 
             List<Transaction> headers = await query
-                .OrderByDescending(t => t.Date)
+                .OrderByDescending(t => _db.TransactionEntries.Any(e =>
+                    e.CompanyId == t.CompanyId &&
+                    e.TransactionNo == t.TransactionNo &&
+                    (e.HasError || (e.Debit == 0m && e.Credit == 0m))))
+                .ThenByDescending(t => t.Date)
                 .ThenByDescending(t => t.TransactionNo)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -195,7 +202,8 @@ namespace GLPack.Services
             List<TransactionEntry> lines = await _db.TransactionEntries
                 .AsNoTracking()
                 .Where(i => i.CompanyId == companyId && transactionNos.Contains(i.TransactionNo))
-                .OrderBy(i => i.TransactionNo)
+                .OrderByDescending(i => i.HasError || (i.Debit == 0m && i.Credit == 0m))
+                .ThenBy(i => i.TransactionNo)
                 .ThenBy(i => i.Id)
                 .ToListAsync(ct);
 
@@ -208,7 +216,8 @@ namespace GLPack.Services
                         AccountCode = x.AccountCode,
                         Debit = x.Debit,
                         Credit = x.Credit,
-                        Memo = x.LineDescription
+                        Memo = x.LineDescription,
+                        HasError = x.HasError || IsZeroZeroEntry(x.Debit, x.Credit)
                     }).ToList()
                 );
 
@@ -301,7 +310,8 @@ namespace GLPack.Services
                 AccountCode = e.AccountCode,
                 LineDescription = e.Memo,
                 Debit = e.Debit,
-                Credit = e.Credit
+                Credit = e.Credit,
+                HasError = IsZeroZeroEntry(e.Debit, e.Credit)
             }).ToList();
 
             _db.TransactionEntries.AddRange(lines);
@@ -331,7 +341,8 @@ namespace GLPack.Services
                     AccountCode = l.AccountCode,
                     Debit = l.Debit,
                     Credit = l.Credit,
-                    Memo = l.LineDescription
+                    Memo = l.LineDescription,
+                    HasError = l.HasError || IsZeroZeroEntry(l.Debit, l.Credit)
                 }).ToList()
             };
         }
@@ -368,8 +379,11 @@ namespace GLPack.Services
                 sourceFile: nameof(TransactionsService),
                 sourceFunction: nameof(DeleteAsync),
                 ct: ct
-                );
+            );
         }
+
+        private static bool IsZeroZeroEntry(decimal debit, decimal credit)
+            => debit == 0m && credit == 0m;
     }
 
 }

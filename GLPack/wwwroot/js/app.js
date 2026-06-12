@@ -850,11 +850,16 @@
         }
 
         function normalizeTx(tx) {
+            const entries = Array.isArray(tx.Entries ?? tx.entries)
+                ? (tx.Entries ?? tx.entries).map(normalizeEntry)
+                : [];
+
             return {
                 transactionNo: tx.TransactionNo ?? tx.transactionNo ?? null,
                 txnDate: tx.TxnDate ?? tx.txnDate ?? null,
                 description: tx.Description ?? tx.description ?? "",
-                entries: Array.isArray(tx.Entries ?? tx.entries) ? (tx.Entries ?? tx.entries).map(normalizeEntry) : [],
+                entries,
+                hasError: Boolean(tx.HasError ?? tx.hasError ?? entries.some(e => e.hasError)),
                 _mode: "view",
                 _selected: false,
                 _orig: null
@@ -862,11 +867,15 @@
         }
 
         function normalizeEntry(e) {
+            const debit = Number(e.Debit ?? e.debit ?? 0) || 0;
+            const credit = Number(e.Credit ?? e.credit ?? 0) || 0;
+
             return {
                 accountCode: (e.AccountCode ?? e.accountCode ?? "").toString(),
-                debit: Number(e.Debit ?? e.debit ?? 0) || 0,
-                credit: Number(e.Credit ?? e.credit ?? 0) || 0,
-                memo: (e.Memo ?? e.memo ?? "").toString()
+                debit,
+                credit,
+                memo: (e.Memo ?? e.memo ?? "").toString(),
+                hasError: Boolean(e.HasError ?? e.hasError ?? false) || (debit === 0 && credit === 0)
             };
         }
 
@@ -967,14 +976,19 @@
         function txRowHtml(row, index) {
             const isSelected = selectedIndex === index;
             const isEditing = row._mode === "edit" || row._mode === "new";
+            const hasError = Boolean(row.hasError || row.entries.some(line => line.hasError));
 
             const baseClasses =
                 "hover:bg-gray-50 dark:hover:bg-neutral-800/60 cursor-pointer";
             const selectedClass = isSelected ? " bg-indigo-50/60 dark:bg-indigo-900/40" : "";
             const editingClass = isEditing ? " border-l-2 border-indigo-500" : "";
+            const errorClass = hasError ? " border-l-2 border-red-500" : "";
+            const statusHtml = hasError
+                ? `<span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:bg-red-950/50 dark:text-red-200">Error</span>`
+                : `<span class="text-xs text-gray-400 dark:text-neutral-500"></span>`;
 
             return `
-              <tr data-index="${index}" class="${baseClasses}${selectedClass}${editingClass}">
+              <tr data-index="${index}" class="${baseClasses}${selectedClass}${editingClass}${errorClass}">
                 <td class="px-3 py-2">
                   <input type="checkbox"
                          class="h-4 w-4 rounded border-gray-300 dark:border-neutral-600 tx-select"
@@ -994,6 +1008,9 @@
                 </td>
                 <td class="px-3 py-2">
                   ${escapeHtml(row.description || "")}
+                </td>
+                <td class="px-3 py-2">
+                  ${statusHtml}
                 </td>
                 <td class="px-3 py-2 text-right space-x-2">
                   <button type="button"
@@ -1040,7 +1057,7 @@
                 if (linesBody) {
                     linesBody.innerHTML = `
               <tr>
-                <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                <td colspan="7" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
                   No transaction selected.
                 </td>
               </tr>
@@ -1085,7 +1102,7 @@
             if (!tx.entries.length && !isEditing) {
                 linesBody.innerHTML = `
             <tr>
-              <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+              <td colspan="7" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
                 This transaction has no lines.
               </td>
             </tr>
@@ -1119,6 +1136,11 @@
         function lineRowHtml(line, idx, editable) {
             const debit = Number(line.debit) || 0;
             const credit = Number(line.credit) || 0;
+            const hasError = Boolean(line.hasError);
+            const rowClass = hasError ? "bg-red-50/60 dark:bg-red-950/20" : "";
+            const statusHtml = hasError
+                ? `<span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:bg-red-950/50 dark:text-red-200">Error</span>`
+                : `<span class="text-xs text-gray-400 dark:text-neutral-500"></span>`;
 
             const options = accounts.map(a => `
               <option value="${escapeHtml(a.code)}"
@@ -1129,7 +1151,7 @@
 
                     if (!editable) {
                         return `
-                    <tr>
+                    <tr class="${rowClass}">
                       <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                       <td class="px-4 py-2">
                         <div class="font-mono text-xs">
@@ -1137,16 +1159,17 @@
                             ${escapeHtml(line.accountCode || "")}
                         </a></div>
                       </td>
-                      <td class="px-4 py-2 text-right font-mono text-xs">${debit ? escapeHtml(debit.toFixed(2)) : "&nbsp;"}</td>
-                      <td class="px-4 py-2 text-left font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
+                      <td class="px-4 py-2 text-right font-mono text-xs">${escapeHtml(debit.toFixed(2))}</td>
+                      <td class="px-4 py-2 text-left font-mono text-xs">${escapeHtml(credit.toFixed(2))}</td>
                       <td class="px-4 py-2 text-xs text-gray-600 dark:text-neutral-300">${escapeHtml(line.memo || "")}</td>
+                      <td class="px-4 py-2">${statusHtml}</td>
                       <td class="px-4 py-2 text-right"></td>
                     </tr>
                   `;
                     }
 
                     return `
-                  <tr data-line-index="${idx}" class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                  <tr data-line-index="${idx}" class="hover:bg-gray-50 dark:hover:bg-neutral-800/60 ${rowClass}">
                     <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                     <td class="px-4 py-2">
                       <select data-field="accountCode"
@@ -1163,7 +1186,7 @@
                              step="0.01"
                              class="w-24 rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
                                     px-2 py-1 text-xs text-right font-mono"
-                             value="${debit ? escapeHtml(debit.toString()) : ""}" />
+                             value="${escapeHtml(debit.toString())}" />
                     </td>
                     <td class="px-4 py-2 text-right">
                       <input data-field="credit"
@@ -1171,7 +1194,7 @@
                              step="0.01"
                              class="w-24 rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
                                     px-2 py-1 text-xs text-left font-mono"
-                             value="${credit ? escapeHtml(credit.toString()) : ""}" />
+                             value="${escapeHtml(credit.toString())}" />
                     </td>
                     <td class="px-4 py-2">
                       <input data-field="memo"
@@ -1179,6 +1202,7 @@
                                     px-2 py-1 text-xs"
                              value="${escapeHtml(line.memo || "")}" />
                     </td>
+                    <td class="px-4 py-2">${statusHtml}</td>
                     <td class="px-4 py-2 text-right">
                       <button type="button"
                               data-action="remove-line"

@@ -5,6 +5,7 @@ using GLPack.ViewModels.Companies;
 using GLPack.ViewModels.Reports;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace GLPack.Controllers
 {
@@ -103,12 +104,20 @@ namespace GLPack.Controllers
         }
 
         [HttpPost("{id:int}/import")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ImportCsv(int id, IFormFile csvFile, CancellationToken ct)
         {
             try
             {
-                int count = await _import.ImportCsvAsync(id, csvFile, ct);
-                TempData["ImportSuccess"] = $"Imported {count} lines.";
+                TransactionImportResult result = await _import.ImportCsvAsync(id, csvFile, ct);
+                int skippedCount = result.SkippedLines.Count;
+                TempData["ImportSuccess"] =
+                    $"Imported {result.ImportedLines} lines. Skipped {skippedCount} lines.";
+
+                if (skippedCount > 0)
+                {
+                    TempData["ImportSkippedLines"] = JsonSerializer.Serialize(result.SkippedLines);
+                }
             }
             catch (Exception ex)
             {

@@ -227,6 +227,12 @@ namespace GLPack.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("debit");
 
+                    b.Property<bool>("HasError")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_error");
+
                     b.Property<string>("LineDescription")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");

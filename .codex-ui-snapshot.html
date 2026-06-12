@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GLPack UI Snapshot</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0a0a0a;
+      color: #f5f5f5;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #0a0a0a; color: #f5f5f5; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 56px;
+      border-bottom: 1px solid #262626;
+      background: rgba(23, 23, 23, .84);
+      backdrop-filter: blur(6px);
+    }
+    .shell { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+    .topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .crumbs, .actions, .row, .toolbar { display: flex; align-items: center; gap: 10px; }
+    .pill, button, .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 34px;
+      border: 1px solid #404040;
+      border-radius: 8px;
+      background: transparent;
+      color: #f5f5f5;
+      padding: 7px 12px;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: default;
+    }
+    .primary { border-color: #4f46e5; background: #4f46e5; color: white; }
+    .muted { color: #a3a3a3; }
+    main { padding: 24px; }
+    .page { max-width: 1280px; margin: 0 auto 48px; }
+    .page-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: 24px; line-height: 1.25; font-weight: 650; letter-spacing: 0; }
+    h2, h3 { margin: 0; font-size: 13px; font-weight: 650; }
+    p { margin: 0; color: #a3a3a3; font-size: 12px; line-height: 1.5; }
+    input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid #404040;
+      border-radius: 8px;
+      background: #171717;
+      color: #f5f5f5;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    label { display: block; margin: 0 0 6px; color: #d4d4d4; font-size: 13px; font-weight: 500; }
+    .login-card {
+      max-width: 448px;
+      margin: 32px auto;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      background: #171717;
+      padding: 24px;
+      box-shadow: 0 14px 28px rgba(0,0,0,.25);
+    }
+    .stack { display: grid; gap: 16px; }
+    .section-label {
+      margin: 34px 0 14px;
+      color: #737373;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .search { max-width: 384px; margin-bottom: 20px; }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .card {
+      min-height: 104px;
+      border: 1px solid #404040;
+      border-radius: 12px;
+      background: transparent;
+      padding: 16px;
+    }
+    .company-card { display: flex; flex-direction: column; justify-content: space-between; }
+    .link { color: #818cf8; font-size: 13px; text-decoration: none; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .wide { grid-column: 1 / -1; }
+    .table-wrap { overflow: hidden; border: 1px solid #262626; border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th {
+      border-bottom: 1px solid #262626;
+      color: #a3a3a3;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: .06em;
+      text-align: left;
+      text-transform: uppercase;
+      padding: 10px 16px;
+    }
+    td { border-bottom: 1px solid #262626; padding: 8px 16px; color: #e5e5e5; }
+    tr:last-child td { border-bottom: 0; }
+    .right { text-align: right; }
+    .modal-preview {
+      max-width: 560px;
+      border: 1px solid #262626;
+      border-radius: 16px;
+      background: #0a0a0a;
+      padding: 16px;
+      box-shadow: 0 22px 44px rgba(0,0,0,.35);
+    }
+    @media (max-width: 900px) {
+      .cards, .grid-2 { grid-template-columns: 1fr; }
+      .page-title, .topbar { align-items: flex-start; flex-direction: column; height: auto; padding: 10px 0; }
+      header { height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell topbar">
+      <div class="crumbs">
+        <span class="pill">⌂ Home</span>
+        <span class="muted">/</span>
+        <strong>Companies</strong>
+      </div>
+      <div class="actions">
+        <span class="pill">● Menu ˅</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page">
+      <div class="section-label">Current Login View</div>
+      <div class="login-card">
+        <form class="stack">
+          <h1>Login</h1>
+          <div>
+            <label>Email</label>
+            <input value="muhammadnabil.hakeem@gmail.com">
+          </div>
+          <div>
+            <label>Password</label>
+            <input type="password" value="super">
+          </div>
+          <div>
+            <button class="primary" type="button">Log in</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="section-label">Current Companies Hub</div>
+      <div class="page-title">
+        <h1>Companies</h1>
+        <button class="primary" type="button">+ New Company</button>
+      </div>
+      <div class="search">
+        <input placeholder="Search companies..." value="">
+      </div>
+      <div class="cards">
+        <div class="card company-card">
+          <h3>GL Pack</h3>
+          <a class="link">Open →</a>
+        </div>
+        <div class="card company-card">
+          <h3>ACME Trading</h3>
+          <a class="link">Open →</a>
+        </div>
+        <div class="card company-card">
+          <h3>Blue Ledger Pte Ltd</h3>
+          <a class="link">Open →</a>
+        </div>
+        <div class="card company-card">
+          <h3>Demo Company</h3>
+          <a class="link">Open →</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="section-label">Current Company Dashboard</div>
+      <div class="page-title">
+        <div>
+          <h1>GL Pack</h1>
+          <p>Company ID: 1</p>
+        </div>
+        <div class="toolbar">
+          <button type="button">Import CSV</button>
+          <button type="button">← All Companies</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+            <h2>Accounts</h2>
+            <a class="link">View all</a>
+          </div>
+          <p>No data loaded yet.</p>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+            <h2>Transactions</h2>
+            <a class="link">View all</a>
+          </div>
+          <p>No data loaded yet.</p>
+        </div>
+
+        <div class="card wide">
+          <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+            <h2>Reports</h2>
+            <a class="link">Open reports</a>
+          </div>
+          <p>View and download Profit &amp; Loss and Trial Balance.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px;">
+        <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
+          <h2>Trial Balance</h2>
+          <a class="link">Open full reports</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th class="right">Debit</th>
+                <th>Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><a class="link">1000</a></td><td><a class="link">Cash at Bank</a></td><td>Asset</td><td class="right">12,500.00</td><td>0.00</td></tr>
+              <tr><td><a class="link">2000</a></td><td><a class="link">Accounts Payable</a></td><td>Liability</td><td class="right">0.00</td><td>4,250.00</td></tr>
+              <tr><td><a class="link">4000</a></td><td><a class="link">Sales Revenue</a></td><td>Income</td><td class="right">0.00</td><td>8,250.00</td></tr>
+              <tr><td colspan="3"><strong>Totals</strong></td><td class="right"><strong>12,500.00</strong></td><td><strong>12,500.00</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-label">Current Import CSV Modal Shape</div>
+      <div class="modal-preview">
+        <div class="row" style="align-items: flex-start; justify-content: space-between;">
+          <div>
+            <h3>Import CSV</h3>
+            <p style="margin-top: 6px;">Columns must be: DATE, TRXNO, LEDGERNAME, PARTICULAR, DRAMOUNT, CRAMOUNT (in this order).</p>
+          </div>
+          <span class="muted">✕</span>
+        </div>
+        <div style="margin-top: 16px;">
+          <input value="Choose file">
+        </div>
+        <div class="row" style="justify-content: flex-end; margin-top: 16px;">
+          <button type="button">Cancel</button>
+          <button class="primary" type="button">Import</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
