@@ -1,6 +1,10 @@
 ﻿@model GLPack.ViewModels.Companies.DashboardViewModel
 @{
     ViewData["Title"] = $"{Model.CompanyName} - Global Search";
+    ViewData["Breadcrumb"] = "Companies";
+    ViewData["CompanyId"] = Model.CompanyId;
+    ViewData["CompanyName"] = Model.CompanyName;
+    ViewData["CompanySection"] = "Search";
 }
 
 <section class="space-y-6">
@@ -11,13 +15,6 @@
                     Company: <span class="font-medium text-gray-700 dark:text-neutral-200">@Model.CompanyName</span>
                 </p>
             </div>
-
-            <a class="inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
-                px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
-                hover:bg-gray-50 dark:hover:bg-neutral-800"
-               href="/company/@Model.CompanyId/dashboard">
-                ← Back to Dashboard
-            </a>
         </div>
 
         <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">

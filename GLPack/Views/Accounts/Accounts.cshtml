@@ -2,6 +2,9 @@
 @{
     ViewData["Title"] = $"{Model.CompanyName} · Accounts";
     ViewData["Breadcrumb"] = "Companies";
+    ViewData["CompanyId"] = Model.CompanyId;
+    ViewData["CompanyName"] = Model.CompanyName;
+    ViewData["CompanySection"] = "Accounts";
 }
 
 <section class="space-y-6">
@@ -19,13 +22,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <a href="/company/@Model.CompanyId/dashboard"
-               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-700
-                      px-3 py-1.5 text-sm text-gray-700 dark:text-neutral-100
-                      hover:bg-gray-50 dark:hover:bg-neutral-800">
-                <span>← Back to dashboard</span>
-            </a>
-
             <button id="btnDeleteAccounts"
                     type="button"
                     class="inline-flex items-center rounded-lg border border-red-300 bg-red-50

@@ -39,13 +39,59 @@ namespace GLPack.Controllers
 
             (List<TrialBalanceRow> tbRows, decimal tbDr, decimal tbCr) = await _reports.GetTrialBalanceAsync(company.Id, ct);
 
+            IQueryable<TransactionEntry> errorQuery = _db.TransactionEntries
+                .AsNoTracking()
+                .Where(e => e.CompanyId == company.Id && (e.HasError || (e.Debit == 0m && e.Credit == 0m)));
+
+            int currentErrorCount = await errorQuery.CountAsync(ct);
+
+            List<DashboardErrorRow> currentErrors = await errorQuery
+                .OrderByDescending(e => e.Transaction.Date)
+                .ThenByDescending(e => e.TransactionNo)
+                .ThenBy(e => e.Id)
+                .Take(10)
+                .Select(e => new DashboardErrorRow
+                {
+                    TransactionNo = e.TransactionNo,
+                    Date = e.Transaction.Date,
+                    AccountCode = e.AccountCode,
+                    AccountName = e.Account.Name,
+                    Memo = e.LineDescription,
+                    Debit = e.Debit,
+                    Credit = e.Credit,
+                    Issue = e.Debit == 0m && e.Credit == 0m
+                        ? "Debit and credit are both zero"
+                        : "Entry marked as error"
+                })
+                .ToListAsync(ct);
+
+            List<DashboardRecentTransactionRow> recentTransactions = await _db.Transactions
+                .AsNoTracking()
+                .Where(t => t.CompanyId == company.Id)
+                .OrderByDescending(t => t.Date)
+                .ThenByDescending(t => t.TransactionNo)
+                .Take(10)
+                .Select(t => new DashboardRecentTransactionRow
+                {
+                    TransactionNo = t.TransactionNo,
+                    Date = t.Date,
+                    Description = t.Description,
+                    TotalDebit = t.Items.Sum(i => i.Debit),
+                    TotalCredit = t.Items.Sum(i => i.Credit),
+                    HasErrors = t.Items.Any(i => i.HasError || (i.Debit == 0m && i.Credit == 0m))
+                })
+                .ToListAsync(ct);
+
             DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name,
                 TrialBalanceRows = tbRows,
                 TrialBalanceTotalDebit = tbDr,
-                TrialBalanceTotalCredit = tbCr
+                TrialBalanceTotalCredit = tbCr,
+                CurrentErrorCount = currentErrorCount,
+                CurrentErrors = currentErrors,
+                RecentTransactions = recentTransactions
             };
 
             // Explicit path so we use Views/Dashboard/Dashboard.cshtml

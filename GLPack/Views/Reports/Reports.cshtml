@@ -2,6 +2,10 @@
 
 @{
     ViewData["Title"] = $"{Model.CompanyName} · Reports";
+    ViewData["Breadcrumb"] = "Companies";
+    ViewData["CompanyId"] = Model.CompanyId;
+    ViewData["CompanyName"] = Model.CompanyName;
+    ViewData["CompanySection"] = "Reports";
 }
 
 <section class="space-y-6">
@@ -12,13 +16,6 @@
                 @Model.CompanyName · Company ID: @Model.CompanyId
             </p>
         </div>
-
-        <a href="/company/@Model.CompanyId/dashboard"
-           class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-700
-                  px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
-                  hover:bg-gray-50 dark:hover:bg-neutral-800">
-            <span>← Back to dashboard</span>
-        </a>
     </div>
 
     <!-- Tabs -->
