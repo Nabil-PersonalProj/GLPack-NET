@@ -1,9 +1,11 @@
-﻿using AspNetCoreGeneratedDocument;
-using GLPack.DAL;
+﻿using GLPack.DAL;
+using GLPack.Models;
 using GLPack.Services;
 using GLPack.ViewModels.Companies;
+using GLPack.ViewModels.Reports;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace GLPack.Controllers
 {
@@ -26,7 +28,7 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/dashboard")]
         public async Task<IActionResult> Dashboard(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
 
@@ -35,15 +37,61 @@ namespace GLPack.Controllers
                 return NotFound();
             }
 
-            var (tbRows, tbDr, tbCr) = await _reports.GetTrialBalanceAsync(company.Id, ct);
+            (List<TrialBalanceRow> tbRows, decimal tbDr, decimal tbCr) = await _reports.GetTrialBalanceAsync(company.Id, ct);
 
-            var vm = new DashboardViewModel
+            IQueryable<TransactionEntry> errorQuery = _db.TransactionEntries
+                .AsNoTracking()
+                .Where(e => e.CompanyId == company.Id && (e.HasError || (e.Debit == 0m && e.Credit == 0m)));
+
+            int currentErrorCount = await errorQuery.CountAsync(ct);
+
+            List<DashboardErrorRow> currentErrors = await errorQuery
+                .OrderByDescending(e => e.Transaction.Date)
+                .ThenByDescending(e => e.TransactionNo)
+                .ThenBy(e => e.Id)
+                .Take(10)
+                .Select(e => new DashboardErrorRow
+                {
+                    TransactionNo = e.TransactionNo,
+                    Date = e.Transaction.Date,
+                    AccountCode = e.AccountCode,
+                    AccountName = e.Account.Name,
+                    Memo = e.LineDescription,
+                    Debit = e.Debit,
+                    Credit = e.Credit,
+                    Issue = e.Debit == 0m && e.Credit == 0m
+                        ? "Debit and credit are both zero"
+                        : "Entry marked as error"
+                })
+                .ToListAsync(ct);
+
+            List<DashboardRecentTransactionRow> recentTransactions = await _db.Transactions
+                .AsNoTracking()
+                .Where(t => t.CompanyId == company.Id)
+                .OrderByDescending(t => t.Date)
+                .ThenByDescending(t => t.TransactionNo)
+                .Take(10)
+                .Select(t => new DashboardRecentTransactionRow
+                {
+                    TransactionNo = t.TransactionNo,
+                    Date = t.Date,
+                    Description = t.Description,
+                    TotalDebit = t.Items.Sum(i => i.Debit),
+                    TotalCredit = t.Items.Sum(i => i.Credit),
+                    HasErrors = t.Items.Any(i => i.HasError || (i.Debit == 0m && i.Credit == 0m))
+                })
+                .ToListAsync(ct);
+
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name,
                 TrialBalanceRows = tbRows,
                 TrialBalanceTotalDebit = tbDr,
-                TrialBalanceTotalCredit = tbCr
+                TrialBalanceTotalCredit = tbCr,
+                CurrentErrorCount = currentErrorCount,
+                CurrentErrors = currentErrors,
+                RecentTransactions = recentTransactions
             };
 
             // Explicit path so we use Views/Dashboard/Dashboard.cshtml
@@ -53,13 +101,13 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/accounts")]
         public async Task<IActionResult> Accounts(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
 
             if (company == null) return NotFound();
 
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name
@@ -71,13 +119,13 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/transactions")]
         public async Task<IActionResult> Transactions(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
 
             if (company == null) return NotFound();
 
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name
@@ -89,11 +137,11 @@ namespace GLPack.Controllers
         [HttpGet("{id:int}/search")]
         public async Task<IActionResult> Search(int id, CancellationToken ct)
         {
-            var company = await _db.Companies
+            Company? company = await _db.Companies
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
             if (company == null) return NotFound();
-            var vm = new DashboardViewModel
+            DashboardViewModel vm = new DashboardViewModel
             {
                 CompanyId = company.Id,
                 CompanyName = company.Name
@@ -102,12 +150,20 @@ namespace GLPack.Controllers
         }
 
         [HttpPost("{id:int}/import")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ImportCsv(int id, IFormFile csvFile, CancellationToken ct)
         {
             try
             {
-                var count = await _import.ImportCsvAsync(id, csvFile, ct);
-                TempData["ImportSuccess"] = $"Imported {count} lines.";
+                TransactionImportResult result = await _import.ImportCsvAsync(id, csvFile, ct);
+                int skippedCount = result.SkippedLines.Count;
+                TempData["ImportSuccess"] =
+                    $"Imported {result.ImportedLines} lines. Skipped {skippedCount} lines.";
+
+                if (skippedCount > 0)
+                {
+                    TempData["ImportSkippedLines"] = JsonSerializer.Serialize(result.SkippedLines);
+                }
             }
             catch (Exception ex)
             {

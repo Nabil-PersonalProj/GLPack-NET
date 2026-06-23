@@ -17,7 +17,7 @@ namespace GLPack.Services
 
         public async Task<AccountDto?> GetAsync(int companyId, string accountCode, CancellationToken ct)
         {
-            var a = await _db.Accounts.AsNoTracking()
+            Account? a = await _db.Accounts.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
             return a is null ? null : new AccountDto
             {
@@ -34,7 +34,7 @@ namespace GLPack.Services
             page = page < 1 ? 1 : page;
             pageSize = pageSize < 1 ? 10 : pageSize;
 
-            var query = _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId);
+            IQueryable<Account> query = _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId);
 
             if (!string.IsNullOrWhiteSpace(q))
             {
@@ -42,9 +42,9 @@ namespace GLPack.Services
                 query = query.Where(a => a.Code.Contains(q) || a.Name.Contains(q));
             }
 
-            var totalCount = await query.CountAsync(ct);
+            int totalCount = await query.CountAsync(ct);
 
-            var items = await query
+            List<AccountDto> items = await query
                 .OrderBy(a => a.Code)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -67,57 +67,9 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<AccountDto> CreateAsync(AccountUpsertDto dto, CancellationToken ct)
-        {
-            // Enforce unique (CompanyId, Code)
-            var exists = await _db.Accounts.AnyAsync(a => a.CompanyId == dto.CompanyId && a.Code == dto.AccountCode, ct);
-            if (exists)
-            {
-                await _appLogger.LogAsync(
-                    eventType: "ERROR",
-                    level: "WARN",
-                    logCode: "ACCOUNTS_CODE_DUP",
-                    logMessage: $"AccountCode '{dto.AccountCode}' already exists",
-                    companyId: dto.CompanyId,
-                    sourceFile: nameof(AccountsService),
-                    sourceFunction: nameof(CreateAsync),
-                    ct: ct);
-                throw new InvalidOperationException("AccountCode already exists for this company.");
-            }
-
-            var entity = new Account
-            {
-                CompanyId = dto.CompanyId,
-                Code = dto.AccountCode,
-                Name = dto.Name,
-                Type = dto.Type
-            };
-
-            _db.Accounts.Add(entity);
-            await _db.SaveChangesAsync(ct);
-            await _appLogger.LogAsync(
-                eventType: "AUDIT",
-                level: "INFO",
-                logCode: "ACCOUNTS_CREATE_OK",
-                logMessage: $"Created account {entity.Code}",
-                companyId: entity.CompanyId,
-                sourceFile: nameof(AccountsService),
-                sourceFunction: nameof(CreateAsync),
-                ct: ct);
-
-            return new AccountDto
-            {
-                Id = entity.Id,
-                CompanyId = entity.CompanyId,
-                AccountCode = entity.Code,
-                Name = entity.Name,
-                Type = entity.Type
-            };
-        }
-
         public async Task UpdateAsync(int companyId, string accountCode, AccountUpsertDto dto, CancellationToken ct)
         {
-            var a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
+            Account? a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
             if (a is null) throw new KeyNotFoundException("Account not found.");
 
             // We do NOT let callers change the business key (Code) via update path.
@@ -138,7 +90,7 @@ namespace GLPack.Services
 
         public async Task DeleteAsync(int companyId, string accountCode, CancellationToken ct)
         {
-            var a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
+            Account? a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
             if (a is null) return;
             _db.Accounts.Remove(a);
             await _db.SaveChangesAsync(ct);
@@ -151,6 +103,114 @@ namespace GLPack.Services
                 sourceFile: nameof(AccountsService),
                 sourceFunction: nameof(DeleteAsync),
                 ct: ct);
+        }
+
+        public async Task<AccountDto> CreateFromPrefixAsync(AccountCreateFromPrefixDto dto, CancellationToken ct)
+        {
+            string prefix = (dto.Prefix ?? "").Trim().ToUpperInvariant();
+            string name = (dto.Name ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(prefix))
+                throw new InvalidOperationException("Prefix is required.");
+
+            if (string.IsNullOrWhiteSpace(name))
+                throw new InvalidOperationException("Account name is required.");
+
+            AccountTypePrefix? prefixRule = await _db.AccountTypePrefixes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Prefix == prefix, ct);
+
+            if (prefixRule is null)
+                throw new InvalidOperationException($"Prefix rule '{prefix}' was not found.");
+
+            string nextCode = await GenerateNextAccountCodeAsync(dto.CompanyId, prefix, ct);
+
+            Account entity = new Account
+            {
+                CompanyId = dto.CompanyId,
+                Code = nextCode,
+                Name = name,
+                Type = prefixRule.AccountType
+            };
+
+            _db.Accounts.Add(entity);
+
+            if (prefix == "FA")
+            {
+                string numberPart = nextCode[prefix.Length..];
+                string pdCode = $"PD{numberPart}";
+
+                bool pdExists = await _db.Accounts.AnyAsync(
+                    x => x.CompanyId == dto.CompanyId && x.Code == pdCode,
+                    ct);
+
+                if (pdExists)
+                    throw new InvalidOperationException($"Linked depreciation account '{pdCode}' already exists.");
+
+                AccountTypePrefix? pdPrefixRule = await _db.AccountTypePrefixes
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Prefix == "PD", ct);
+
+                if (pdPrefixRule is null)
+                    throw new InvalidOperationException("PD prefix rule was not found.");
+
+                Account entityPD = new Account
+                {
+                    CompanyId = dto.CompanyId,
+                    Code = pdCode,
+                    Name = $"{name} - {nextCode}",
+                    Type = pdPrefixRule.AccountType
+                };
+
+                _db.Accounts.Add(entityPD);
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            await _appLogger.LogAsync(
+                eventType: "AUDIT",
+                level: "INFO",
+                logCode: "ACCOUNTS_CREATE_FROM_PREFIX_OK",
+                logMessage: $"Created account {entity.Code} from prefix {prefix}",
+                companyId: entity.CompanyId,
+                sourceFile: nameof(AccountsService),
+                sourceFunction: nameof(CreateFromPrefixAsync),
+                ct: ct);
+
+            return new AccountDto
+            {
+                Id = entity.Id,
+                CompanyId = entity.CompanyId,
+                AccountCode = entity.Code,
+                Name = entity.Name,
+                Type = entity.Type
+            };
+        }
+        private async Task<string> GenerateNextAccountCodeAsync(int companyId, string prefix, CancellationToken ct)
+        {
+            List<string> existingCodes = await _db.Accounts
+                .AsNoTracking()
+                .Where(a => a.CompanyId == companyId && a.Code.StartsWith(prefix))
+                .Select(a => a.Code)
+                .ToListAsync(ct);
+
+            int maxNumber = 0;
+
+            foreach (string code in existingCodes)
+            {
+                if (code.Length <= prefix.Length)
+                    continue;
+
+                string numberPart = code[prefix.Length..];
+
+                if (int.TryParse(numberPart, out int number) && number > maxNumber)
+                {
+                    maxNumber = number;
+                }
+            }
+
+            int nextNumber = maxNumber + 1;
+            return $"{prefix}{nextNumber:000}";
         }
     }
 }

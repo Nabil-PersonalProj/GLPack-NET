@@ -23,7 +23,7 @@ namespace GLPack.Controllers
             int pageSize = 100,
             CancellationToken ct = default)
         {
-            var results = await _svc.SearchAsync(companyId, q, accountCode, transactionNo, from, to, page, pageSize, ct);
+            IEnumerable<LedgerRowDto> results = await _svc.SearchAsync(companyId, q, accountCode, transactionNo, from, to, page, pageSize, ct);
             return Ok(results);
         }
     }

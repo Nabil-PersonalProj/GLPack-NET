@@ -6,8 +6,8 @@ namespace GLPack.Services
     {
         Task<AccountDto?> GetAsync(int companyId, string accountCode, CancellationToken ct);
         Task<PagedResult<AccountDto>> ListAsync(int companyId, string? q, int page, int pageSize, CancellationToken ct);
-        Task<AccountDto> CreateAsync(AccountUpsertDto dto, CancellationToken ct);
         Task UpdateAsync(int companyId, string accountCode, AccountUpsertDto dto, CancellationToken ct);
         Task DeleteAsync(int companyId, string accountCode, CancellationToken ct); // optional
+        Task<AccountDto> CreateFromPrefixAsync(AccountCreateFromPrefixDto dto, CancellationToken ct);
     }
 }

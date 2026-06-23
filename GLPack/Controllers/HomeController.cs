@@ -31,9 +31,9 @@ namespace GLPack.Controllers
         [HttpGet("/")]
         public async Task<IActionResult> Index(string? q, CancellationToken ct)
         {
-            var picks = await _companies.GetQuickPicksAsync(q, 200, ct);
+            IReadOnlyList<CompanyQuickPick> picks = await _companies.GetQuickPicksAsync(q, 200, ct);
             return View(new HomeIndexViewModel { Search = q, QuickPicks = picks.ToList() });
         }
-        
+
     }
 }

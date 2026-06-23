@@ -14,4 +14,12 @@
         public int Id { get; init; }                  // DB surrogate key (if you use one)
         public DateTime CreatedAt { get; init; }
     }
+
+    public class AccountCreateFromPrefixDto
+    {
+        public required int CompanyId { get; init; }
+        public required string Prefix { get; init; }
+        public required string Name { get; init; }
+        public bool IsActive { get; init; } = true;
+    }
 }

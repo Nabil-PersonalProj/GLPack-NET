@@ -1,31 +1,244 @@
 ﻿@* Views/Shared/_Layout.cshtml *@
+@{
+    string? companyId = ViewData["CompanyId"]?.ToString();
+    string? companyName = ViewData["CompanyName"]?.ToString();
+    string? companySection = ViewData["CompanySection"]?.ToString();
+    bool hasCompanyNav = !string.IsNullOrWhiteSpace(companyId) && !string.IsNullOrWhiteSpace(companyName);
+    bool IsCompanySection(string section) =>
+        string.Equals(companySection, section, StringComparison.OrdinalIgnoreCase);
+    string CompanyNavClass(string section) =>
+        IsCompanySection(section)
+            ? "bg-indigo-600 font-medium text-white shadow-sm shadow-blue-950/20"
+            : "text-slate-300 hover:bg-white/10 hover:text-white";
+    string MobileCompanyNavClass(string section) =>
+        IsCompanySection(section)
+            ? "bg-indigo-600 font-medium text-white"
+            : "text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-900";
+}
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@(ViewData["Title"] ?? "GLPack")</title>
 
+    <script>
+        window.tailwind = window.tailwind || {};
+        tailwind.config = {
+            darkMode: 'class'
+        };
+
+        (function () {
+            const savedTheme = localStorage.getItem("glpack-theme") || "light";
+            document.documentElement.classList.toggle("dark", savedTheme === "dark");
+            document.documentElement.dataset.theme = savedTheme;
+        })();
+    </script>
+
     <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-        darkMode: 'class'
-        };
-    </script>
 
     <!-- Font Awesome (optional) -->
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 
+    <style>
+        :root {
+            color-scheme: light;
+            --gl-page: #f4f7fb;
+            --gl-accent: #1478e8;
+            --gl-accent-hover: #0f6fd8;
+            --gl-link: #1478e8;
+            --gl-link-soft: #0f6fd8;
+            --gl-selected: rgb(20 120 232 / 0.08);
+            --gl-selected-strong: rgb(20 120 232 / 0.14);
+            --gl-ring: #60a5fa;
+            --gl-sidebar: #10243b;
+            --gl-sidebar-dark: #0b1726;
+            --gl-dark-surface: #151f2e;
+            --gl-dark-surface-soft: #172335;
+            --gl-dark-topbar: #111c2b;
+            --gl-dark-border: #26364b;
+            --gl-dark-border-soft: #33465f;
+            --gl-dark-text: #e5edf7;
+            --gl-dark-muted: #97a8bd;
+        }
+
+        .dark {
+            color-scheme: dark;
+            --gl-page: #0f1724;
+            --gl-accent: #2f81f7;
+            --gl-accent-hover: #4d95ff;
+            --gl-link: #60a5fa;
+            --gl-link-soft: #93c5fd;
+            --gl-selected: rgb(47 129 247 / 0.16);
+            --gl-selected-strong: rgb(47 129 247 / 0.24);
+            --gl-ring: #60a5fa;
+        }
+
+        body {
+            background: var(--gl-page);
+        }
+
+        .gl-company-sidebar {
+            background-color: var(--gl-sidebar);
+            border-color: rgb(255 255 255 / 0.1) !important;
+        }
+
+        .dark .gl-company-sidebar {
+            background-color: var(--gl-sidebar-dark);
+        }
+
+        html:not(.dark) .dark\:bg-neutral-950,
+        html:not(.dark) .dark\:bg-neutral-900 {
+            background-color: #ffffff !important;
+        }
+
+        html:not(.dark) .dark\:bg-neutral-900\/80 {
+            background-color: rgb(255 255 255 / 0.8) !important;
+        }
+
+        html:not(.dark) .dark\:bg-neutral-900\/60 {
+            background-color: rgb(249 250 251 / 0.6) !important;
+        }
+
+        html:not(.dark) .dark\:bg-neutral-900\/40 {
+            background-color: rgb(249 250 251 / 0.8) !important;
+        }
+
+        html:not(.dark) .dark\:bg-neutral-800,
+        html:not(.dark) .dark\:hover\:bg-neutral-800:hover,
+        html:not(.dark) .dark\:hover\:bg-neutral-900:hover {
+            background-color: #f9fafb !important;
+        }
+
+        html:not(.dark) .dark\:border-neutral-800 {
+            border-color: #e5e7eb !important;
+        }
+
+        html:not(.dark) .dark\:border-neutral-700 {
+            border-color: #d1d5db !important;
+        }
+
+        html:not(.dark) .dark\:divide-neutral-800 > :not([hidden]) ~ :not([hidden]) {
+            border-color: #f3f4f6 !important;
+        }
+
+        html:not(.dark) .dark\:text-white,
+        html:not(.dark) .dark\:text-neutral-100 {
+            color: #111827 !important;
+        }
+
+        html:not(.dark) .dark\:text-neutral-300 {
+            color: #374151 !important;
+        }
+
+        html:not(.dark) .dark\:text-neutral-200 {
+            color: #374151 !important;
+        }
+
+        html:not(.dark) .dark\:text-neutral-400,
+        html:not(.dark) .dark\:text-neutral-500 {
+            color: #6b7280 !important;
+        }
+
+        .dark .dark\:bg-neutral-950 {
+            background-color: var(--gl-page) !important;
+        }
+
+        .dark .dark\:bg-neutral-900,
+        .dark .dark\:bg-neutral-900\/60,
+        .dark .dark\:bg-neutral-900\/80 {
+            background-color: var(--gl-dark-surface) !important;
+        }
+
+        .dark .dark\:bg-neutral-800,
+        .dark .dark\:hover\:bg-neutral-800:hover,
+        .dark .dark\:hover\:bg-neutral-900:hover {
+            background-color: var(--gl-dark-surface-soft) !important;
+        }
+
+        .dark .dark\:bg-neutral-900\/80 {
+            background-color: rgb(17 28 43 / 0.8) !important;
+        }
+
+        .dark .dark\:border-neutral-800 {
+            border-color: var(--gl-dark-border) !important;
+        }
+
+        .dark .dark\:border-neutral-700 {
+            border-color: var(--gl-dark-border-soft) !important;
+        }
+
+        .dark .dark\:text-neutral-100,
+        .dark .dark\:text-white {
+            color: var(--gl-dark-text) !important;
+        }
+
+        .dark .dark\:text-neutral-400,
+        .dark .dark\:text-neutral-300,
+        .dark .dark\:text-neutral-500 {
+            color: var(--gl-dark-muted) !important;
+        }
+
+        .bg-indigo-600 {
+            background-color: var(--gl-accent) !important;
+        }
+
+        .hover\:bg-indigo-500:hover {
+            background-color: var(--gl-accent-hover) !important;
+        }
+
+        .text-indigo-600,
+        .text-indigo-500 {
+            color: var(--gl-link) !important;
+        }
+
+        .dark .dark\:text-indigo-400,
+        .text-indigo-300,
+        .hover\:text-indigo-400:hover,
+        .hover\:text-indigo-200:hover {
+            color: var(--gl-link-soft) !important;
+        }
+
+        .border-indigo-500 {
+            border-color: var(--gl-accent) !important;
+        }
+
+        .focus\:ring-indigo-400:focus,
+        .focus\:ring-indigo-500:focus,
+        .focus\:ring-slate-400:focus {
+            --tw-ring-color: var(--gl-ring) !important;
+        }
+
+        .bg-indigo-50,
+        .bg-indigo-50\/60 {
+            background-color: var(--gl-selected) !important;
+        }
+
+        .dark .dark\:bg-indigo-900\/40,
+        .dark .dark\:bg-indigo-950\/40 {
+            background-color: var(--gl-selected-strong) !important;
+        }
+
+        .border-indigo-300\/40 {
+            border-color: rgb(20 120 232 / 0.28) !important;
+        }
+
+        .text-indigo-700,
+        .dark .dark\:text-indigo-200 {
+            color: var(--gl-link) !important;
+        }
+    </style>
+
     @RenderSection("head", required: false)
 </head>
-<body class="min-h-screen bg-gray-50 dark:bg-neutral-950 text-gray-900 dark:text-neutral-100">
+<body class="min-h-screen text-gray-900 dark:text-neutral-100">
 
     <!-- Top bar -->
-    <header class="sticky top-0 z-40 bg-white/80 dark:bg-neutral-900/80 border-b border-gray-200 dark:border-neutral-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-            <div class="flex items-center gap-2">
+    <header class="sticky top-0 z-40 bg-white/80 dark:bg-neutral-900/80 border-b border-gray-200 dark:border-neutral-800 @(hasCompanyNav ? "lg:pl-60" : "")">
+        <div class="@(hasCompanyNav ? "px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between")">
+            <div class="flex min-w-0 items-center gap-2">
                 <a href="/"
                    class="inline-flex items-center gap-2 text-sm rounded-lg border px-3 py-1.5
                           text-gray-700 dark:text-neutral-100 border-gray-200 dark:border-neutral-700">
@@ -33,9 +246,34 @@
                     <span>Home</span>
                 </a>
                 <span class="text-gray-400">/</span>
-                <span class="font-semibold">@ViewData["Breadcrumb"]</span>
+                @if (hasCompanyNav)
+                {
+                    <a href="/"
+                       class="text-sm text-gray-600 dark:text-neutral-300 hover:text-gray-900 dark:hover:text-white">
+                        Companies
+                    </a>
+                    <span class="text-gray-400">/</span>
+                    <span class="truncate text-sm font-semibold">@companyName</span>
+                    @if (!string.IsNullOrWhiteSpace(companySection))
+                    {
+                        <span class="hidden text-gray-400 sm:inline">/</span>
+                        <span class="hidden truncate text-sm text-gray-600 dark:text-neutral-300 sm:inline">@companySection</span>
+                    }
+                }
+                else
+                {
+                    <span class="font-semibold">@ViewData["Breadcrumb"]</span>
+                }
             </div>
             <div class="flex items-center gap-3 text-sm">
+                <button type="button"
+                        id="themeToggleButton"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600
+                               hover:bg-gray-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                        aria-label="Switch to dark mode"
+                        title="Switch theme">
+                    <i id="themeToggleIcon" class="fa-solid fa-moon"></i>
+                </button>
                 @if (User.Identity?.IsAuthenticated ?? false)
                 {
                     <div class="relative" id="userMenuRoot">
@@ -100,12 +338,121 @@
     </header>
 
     <!-- Main content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        @RenderBody()
-    </main>
+    @if (hasCompanyNav)
+    {
+        <div class="lg:pl-60">
+            <aside class="gl-company-sidebar fixed inset-y-0 left-0 z-50 hidden w-60 border-r px-5 py-5 lg:block">
+                <div class="mb-5">
+                    <h2 class="mt-1 truncate text-sm font-semibold text-white">
+                        @companyName
+                    </h2>
+                </div>
+
+                <nav class="space-y-1 text-sm" aria-label="Company navigation">
+                    <a href="/company/@companyId/dashboard"
+                       aria-current="@(IsCompanySection("Dashboard") ? "page" : null)"
+                       class="flex items-center justify-between rounded-lg px-3 py-2 @CompanyNavClass("Dashboard")">
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/company/@companyId/accounts"
+                       aria-current="@(IsCompanySection("Accounts") ? "page" : null)"
+                       class="flex items-center justify-between rounded-lg px-3 py-2 @CompanyNavClass("Accounts")">
+                        <span>Accounts</span>
+                    </a>
+                    <a href="/company/@companyId/transactions"
+                       aria-current="@(IsCompanySection("Transactions") ? "page" : null)"
+                       class="flex items-center justify-between rounded-lg px-3 py-2 @CompanyNavClass("Transactions")">
+                        <span>Transactions</span>
+                    </a>
+                    <a href="/company/@companyId/reports"
+                       aria-current="@(IsCompanySection("Reports") ? "page" : null)"
+                       class="flex items-center justify-between rounded-lg px-3 py-2 @CompanyNavClass("Reports")">
+                        <span>Reports</span>
+                    </a>
+                </nav>
+
+                <div class="mt-6 border-t border-gray-200 dark:border-neutral-800 pt-4">
+                    <a href="/company/@companyId/search"
+                       aria-current="@(IsCompanySection("Search") ? "page" : null)"
+                       class="flex items-center justify-between rounded-lg px-3 py-2 text-sm @CompanyNavClass("Search")">
+                        <span>Search</span>
+                    </a>
+                </div>
+
+                <div class="mt-4 border-t border-white/10 pt-4">
+                    <a href="/"
+                       class="text-xs text-slate-400 hover:text-white">
+                        Back to all companies
+                    </a>
+                </div>
+            </aside>
+
+            <div class="min-w-0">
+                <nav class="flex gap-2 overflow-x-auto border-b border-gray-200 dark:border-neutral-800 px-4 py-3 text-sm lg:hidden" aria-label="Company navigation">
+                    <a href="/company/@companyId/dashboard"
+                       aria-current="@(IsCompanySection("Dashboard") ? "page" : null)"
+                       class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Dashboard")">
+                        Dashboard
+                    </a>
+                    <a href="/company/@companyId/accounts"
+                       aria-current="@(IsCompanySection("Accounts") ? "page" : null)"
+                       class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Accounts")">
+                        Accounts
+                    </a>
+                    <a href="/company/@companyId/transactions"
+                       aria-current="@(IsCompanySection("Transactions") ? "page" : null)"
+                       class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Transactions")">
+                        Transactions
+                    </a>
+                    <a href="/company/@companyId/reports"
+                       aria-current="@(IsCompanySection("Reports") ? "page" : null)"
+                       class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Reports")">
+                        Reports
+                    </a>
+                    <a href="/company/@companyId/search"
+                       aria-current="@(IsCompanySection("Search") ? "page" : null)"
+                       class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Search")">
+                        Search
+                    </a>
+                </nav>
+
+                <main class="min-w-0 px-4 sm:px-6 lg:px-8 py-6">
+                    <div class="w-full">
+                        @RenderBody()
+                    </div>
+                </main>
+            </div>
+        </div>
+    }
+    else
+    {
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            @RenderBody()
+        </main>
+    }
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+        const themeButton = document.getElementById("themeToggleButton");
+        const themeIcon = document.getElementById("themeToggleIcon");
+        const setTheme = (theme) => {
+        const isDark = theme === "dark";
+        document.documentElement.classList.toggle("dark", isDark);
+        document.documentElement.dataset.theme = theme;
+        localStorage.setItem("glpack-theme", theme);
+        if (themeButton && themeIcon) {
+        themeButton.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+        themeButton.setAttribute("title", isDark ? "Switch to light mode" : "Switch to dark mode");
+        themeIcon.className = isDark ? "fa-solid fa-sun" : "fa-solid fa-moon";
+        }
+        };
+
+        setTheme(localStorage.getItem("glpack-theme") || "light");
+        themeButton?.addEventListener("click", () => {
+        const nextTheme = document.documentElement.classList.contains("dark") ? "light" : "dark";
+        setTheme(nextTheme);
+        });
+
         const root = document.getElementById("userMenuRoot");
         const button = document.getElementById("userMenuButton");
         const dropdown = document.getElementById("userMenuDropdown");

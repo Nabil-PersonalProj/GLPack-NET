@@ -28,7 +28,13 @@
             } catch { /* ignore parse error */ }
 
             const message =
-                (payload && (payload.message || payload.error)) ||
+                (payload && (
+                    payload.message ||
+                    payload.error ||
+                    payload.detail ||
+                    extractModelStateErrors(payload.errors) ||
+                    payload.title
+                )) ||
                 (typeof payload === "string" ? payload : res.statusText);
 
             const err = new Error(message || `HTTP ${res.status}`);
@@ -41,6 +47,24 @@
             return res.json();
         }
         return res.text();
+    }
+
+    function extractModelStateErrors(errors) {
+        if (!errors) return null;
+
+        const messages = [];
+
+        for (const key of Object.keys(errors)) {
+            const value = errors[key];
+
+            if (Array.isArray(value)) {
+                messages.push(...value);
+            } else if (typeof value === "string") {
+                messages.push(value);
+            }
+        }
+
+        return messages.length ? messages.join(" ") : null;
     }
 
     // ----- Companies API -----
@@ -80,8 +104,8 @@
         return request(`/api/companies/${companyId}/accounts?` + params.toString());
     }
 
-    function createAccount(companyId, dto) {
-        return request(`/api/companies/${companyId}/accounts`, {
+    function createAccountFromPrefix(companyId, dto) {
+        return request(`/api/companies/${companyId}/accounts/from-prefix`, {
             method: "POST",
             body: Object.assign({ companyId }, dto)
         });
@@ -142,7 +166,7 @@
         });
     }
 
-    // ----- Accounts API -----
+    // ----- Search API -----
     function ledgerSearch(companyId, opts = {}) {
         const {
             q = "",
@@ -166,13 +190,100 @@
         return request(`/api/companies/${companyId}/search?` + params.toString());
     }
 
+    // ----- Logs API -----
+    function getLogs(opts = {}) {
+        const {
+            q = "",
+            level = "",
+            eventType = "",
+            page = 1,
+            pageSize = 50
+        } = opts;
+
+        const params = new URLSearchParams();
+
+        if (q) params.set("q", q);
+        if (level) params.set("level", level);
+        if (eventType) params.set("eventType", eventType);
+
+        params.set("page", String(page));
+        params.set("pageSize", String(pageSize));
+
+        return request("/api/admin/logs?" + params.toString());
+    }
+
+    // ----- Account Type Prefix -----
+    function getAccountPrefixRules() {
+        return request("/api/admin/prefix-rules");
+    }
+
+    function getAccountTypes() {
+        return request("/api/admin/account-types");
+    }
+
+    function createAccountPrefixRule(dto) {
+        return request("/api/admin/prefix-rules", {
+            method: "POST",
+            body: dto
+        });
+    }
+
+    function updateAccountPrefixRule(prefix, dto) {
+        return request(`/api/admin/prefix-rules/${encodeURIComponent(prefix)}`, {
+            method: "PUT",
+            body: dto
+        });
+    }
+
+    function deleteAccountPrefixRule(prefix) {
+        return request(`/api/admin/prefix-rules/${encodeURIComponent(prefix)}`, {
+            method: "DELETE"
+        });
+    }
+
+    function getAccountPrefixRulesForAccounts(companyId) {
+        return request(`/api/companies/${companyId}/accounts/prefix-rules`);
+    }
+
+    // ----- User Account API -----
+    function getAdminUsers() {
+        return request("/api/admin/users");
+    }
+
+    function createAdminUser(dto) {
+        return request("/api/admin/users", {
+            method: "POST",
+            body: dto
+        });
+    }
+
+    function updateAdminUser(id, dto) {
+        return request(`/api/admin/users/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            body: dto
+        });
+    }
+
+    function resetAdminUserPassword(id, dto) {
+        return request(`/api/admin/users/${encodeURIComponent(id)}/reset-password`, {
+            method: "POST",
+            body: dto
+        });
+    }
+
+    function deleteAdminUser(id) {
+        return request(`/api/admin/users/${encodeURIComponent(id)}`, {
+            method: "DELETE"
+        });
+    }
+
     global.API = {
         getCompanies,
         createCompany,
         deleteCompany,
         companyDashboardUrl,
         getAccounts,
-        createAccount,
+        createAccountFromPrefix,
         updateAccount,
         deleteAccount,
         getTransactions,
@@ -180,5 +291,17 @@
         updateTransaction,
         deleteTransaction,
         ledgerSearch,
+        getLogs,
+        getAccountPrefixRules,
+        createAccountPrefixRule,
+        updateAccountPrefixRule,
+        deleteAccountPrefixRule,
+        getAdminUsers,
+        createAdminUser,
+        updateAdminUser,
+        resetAdminUserPassword,
+        deleteAdminUser,
+        getAccountTypes,
+        getAccountPrefixRulesForAccounts,
     };
 })(window);

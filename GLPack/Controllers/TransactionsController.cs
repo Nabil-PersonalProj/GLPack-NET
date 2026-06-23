@@ -23,7 +23,7 @@ namespace GLPack.Controllers
             int? transactionNo = null,
             CancellationToken ct = default)
         {
-            var (items, total) = await _svc.ListAsync(companyId, page, pageSize, q, transactionNo, from, to, ct);
+            (var items, int total) = await _svc.ListAsync(companyId, page, pageSize, q, transactionNo, from, to, ct);
 
             return Ok(new PagedResult<Tx.TransactionDto>
             {
@@ -37,7 +37,7 @@ namespace GLPack.Controllers
         [HttpGet("{transactionNo:int}")]
         public async Task<ActionResult<Tx.TransactionDto>> Get(int companyId, int transactionNo, CancellationToken ct)
         {
-            var item = await _svc.GetAsync(companyId, transactionNo, ct);
+            Tx.TransactionDto? item = await _svc.GetAsync(companyId, transactionNo, ct);
             return item is null ? NotFound() : Ok(item);
         }
 
@@ -51,7 +51,7 @@ namespace GLPack.Controllers
 
             try
             {
-                var created = await _svc.CreateAsync(dto, ct);
+                Tx.TransactionDto created = await _svc.CreateAsync(dto, ct);
                 return CreatedAtAction(nameof(Get), new { companyId, transactionNo = created.TransactionNo }, created);
             }
             catch (InvalidOperationException ex)
@@ -72,8 +72,8 @@ namespace GLPack.Controllers
 
             try
             {
-                await _svc.UpdateAsync(companyId, transactionNo, dto, ct);
-                return NoContent();
+                Tx.TransactionDto updated = await _svc.UpdateAsync(companyId, transactionNo, dto, ct);
+                return Ok(updated);
             }
             catch (KeyNotFoundException)
             {

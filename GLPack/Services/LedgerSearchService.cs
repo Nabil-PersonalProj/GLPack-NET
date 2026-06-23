@@ -26,7 +26,6 @@ namespace GLPack.Services
             q = string.IsNullOrWhiteSpace(q) ? null : q.Trim();
             accountCode = string.IsNullOrWhiteSpace(accountCode) ? null : accountCode.Trim();
 
-            // Base: ledger lines (TransactionEntry) joined with Transaction + Account
             var query =
                 from e in _db.TransactionEntries.AsNoTracking()
                 join t in _db.Transactions.AsNoTracking()
@@ -51,14 +50,16 @@ namespace GLPack.Services
 
             if (q is not null)
             {
-                var qIsInt = int.TryParse(q, out var qInt);
+                bool qIsInt = int.TryParse(q, out int qInt);
 
                 query = query.Where(x =>
                     (qIsInt && x.t.TransactionNo == qInt) ||
                     EF.Functions.ILike(x.a.Code, $"%{q}%") ||
                     EF.Functions.ILike(x.a.Name, $"%{q}%") ||
                     (x.t.Description != null && EF.Functions.ILike(x.t.Description, $"%{q}%")) ||
-                    (x.e.LineDescription != null && EF.Functions.ILike(x.e.LineDescription, $"%{q}%"))
+                    (x.e.LineDescription != null && EF.Functions.ILike(x.e.LineDescription, $"%{q}%")) ||
+                    (qIsInt && x.e.Debit == qInt) ||
+                    (qIsInt && x.e.Credit == qInt)
                 );
             }
 
@@ -69,7 +70,7 @@ namespace GLPack.Services
                 .ThenBy(x => x.a.Code);
 
             // Page + shape DTO
-            var rows = await query
+            List<LedgerRowDto> rows = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new LedgerRowDto

@@ -13,6 +13,8 @@
             initTransactionsIndex();
         } else if (page === "ledgerSearch") {
             initLedgerSearch();
+        } else if (page === "adminIndex") {
+            initAdminIndex();
         }
     });
 
@@ -225,6 +227,7 @@
         if (!companyId || !tbody) return;
 
         let rows = [];
+        let prefixRules = [];
         let currentPage = 1;
         let pageSize = 10;
         let totalCount = 0;
@@ -258,6 +261,19 @@
                   `;
                 if (pagerHost) pagerHost.innerHTML = "";
             }
+        }
+
+        async function loadPrefixRulesForAccounts() {
+            if (prefixRules.length) return prefixRules;
+
+            prefixRules = await API.getAccountPrefixRulesForAccounts(companyId);
+
+            prefixRules = (prefixRules || []).map(r => ({
+                prefix: r.prefix ?? r.Prefix ?? "",
+                accountType: r.accountType ?? r.AccountType ?? ""
+            }));
+
+            return prefixRules;
         }
 
         function normalizeAccount(acc) {
@@ -305,6 +321,13 @@
         function rowHtml(row, index) {
             if (row._mode === "edit" || row._mode === "new") {
                 const isNew = row._mode === "new";
+
+                const prefixOptions = prefixRules.map(rule => `
+                        <option value="${escapeHtml(rule.prefix)}" ${row.prefix === rule.prefix ? "selected" : ""}>
+                            ${escapeHtml(rule.prefix)} - ${escapeHtml(rule.accountType)}
+                        </option>
+                    `).join("");
+
                 return `
                     <tr data-index="${index}" class="bg-neutral-900/10 dark:bg-neutral-800/60">
                       <td class="px-3 py-2">
@@ -312,24 +335,51 @@
                                class="h-4 w-4 rounded border-gray-300 dark:border-neutral-600 acc-select"
                                ${row._selected ? "checked" : ""} />
                       </td>
+
                       <td class="px-3 py-2">
-                        <input data-field="accountCode"
-                               class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                      px-2 py-1 text-xs font-mono"
-                               value="${escapeHtml(row.accountCode || "")}" />
+                        ${isNew
+                                    ? `
+                                <select data-field="prefix"
+                                        class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                               px-2 py-1 text-xs font-mono">
+                                    <option value="">Select prefix...</option>
+                                    ${prefixOptions}
+                                </select>
+                              `
+                                    : `
+                                <input data-field="accountCode"
+                                       class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                              px-2 py-1 text-xs font-mono"
+                                       value="${escapeHtml(row.accountCode || "")}" />
+                              `
+                                }
                       </td>
+
                       <td class="px-3 py-2">
                         <input data-field="name"
                                class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
                                       px-2 py-1 text-xs"
                                value="${escapeHtml(row.name || "")}" />
                       </td>
+
                       <td class="px-3 py-2">
-                        <input data-field="type"
-                               class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                      px-2 py-1 text-xs"
-                               value="${escapeHtml(row.type || "")}" />
+                        ${isNew
+                                    ? `
+                                <span class="text-xs text-gray-500 dark:text-neutral-400">
+                                    ${escapeHtml(
+                                        prefixRules.find(r => r.prefix === row.prefix)?.accountType || "Type comes from prefix"
+                                    )}
+                                </span>
+                              `
+                                    : `
+                                <input data-field="type"
+                                       class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                              px-2 py-1 text-xs"
+                                       value="${escapeHtml(row.type || "")}" />
+                              `
+                                }
                       </td>
+
                       <td class="px-3 py-2 text-right space-x-2">
                         <button type="button"
                                 data-action="save"
@@ -343,8 +393,8 @@
                         </button>
                       </td>
                     </tr>
-                  `;
-            }
+                `;
+                        }
 
             // view mode
             return `
@@ -410,14 +460,21 @@
             if (!row) return;
 
             const code = (row.accountCode || "").trim();
+            const prefix = (row.prefix || "").trim().toUpperCase();
             const name = (row.name || "").trim();
             const type = (row.type || "").trim() || "Unknown";
-            const isActive = !!row.isActive;
+            const isActive = row.isActive !== false;
 
-            if (!code) {
+            if (row._mode === "new" && !prefix) {
+                showAlert(alertHost, "danger", "Prefix is required.");
+                return;
+            }
+
+            if (row._mode !== "new" && !code) {
                 showAlert(alertHost, "danger", "Account code is required.");
                 return;
             }
+
             if (!name) {
                 showAlert(alertHost, "danger", "Account name is required.");
                 return;
@@ -432,10 +489,16 @@
 
             try {
                 if (row._mode === "new") {
-                    const created = await API.createAccount(companyId, dto);
+                    const created = await API.createAccountFromPrefix(companyId, {
+                        prefix,
+                        name,
+                        isActive
+                    });
                     const normalized = normalizeAccount(created || dto);
                     rows[index] = Object.assign(normalized, { _mode: "view", _selected: true });
                     showAlert(alertHost, "success", "Account created.");
+                    await load();
+                    return;
                 } else {
                     const originalCode = row._orig?.accountCode || row.accountCode;
                     const updated = await API.updateAccount(companyId, originalCode, dto);
@@ -497,18 +560,31 @@
 
         // ---------- events ----------
         if (btnAdd) {
-            btnAdd.addEventListener("click", () => {
-                rows.unshift({
-                    accountCode: "",
-                    name: "",
-                    type: "",
-                    isActive: true,
-                    createdAt: null,
-                    _mode: "new",
-                    _selected: false,
-                    _orig: null
-                });
-                render();
+            btnAdd.addEventListener("click", async () => {
+                try {
+                    await loadPrefixRulesForAccounts();
+
+                    if (!prefixRules.length) {
+                        showAlert(alertHost, "danger", "No prefix rules found. Create prefix rules in Admin Console first.");
+                        return;
+                    }
+
+                    rows.unshift({
+                        accountCode: "",
+                        prefix: "",
+                        name: "",
+                        type: "",
+                        isActive: true,
+                        createdAt: null,
+                        _mode: "new",
+                        _selected: false,
+                        _orig: null
+                    });
+
+                    render();
+                } catch (err) {
+                    showAlert(alertHost, "danger", "Failed to load prefix rules: " + err.message);
+                }
             });
         }
 
@@ -586,6 +662,33 @@
             }
         });
 
+        tbody.addEventListener("change", (e) => {
+            const tr = e.target.closest("tr[data-index]");
+            if (!tr) return;
+
+            const index = Number(tr.getAttribute("data-index"));
+            if (Number.isNaN(index)) return;
+
+            const field = e.target.getAttribute("data-field");
+            if (!field) return;
+
+            if (field === "prefix") {
+                rows[index].prefix = e.target.value;
+
+                const selectedRule = prefixRules.find(r => r.prefix === e.target.value);
+                rows[index].type = selectedRule?.accountType || "";
+
+                render();
+                return;
+            }
+
+            if (field === "isActive") {
+                rows[index].isActive = e.target.checked;
+            } else {
+                rows[index][field] = e.target.value;
+            }
+        });
+
         load();
     }
 
@@ -637,11 +740,12 @@
         const btnCancelQuickAccount = document.querySelector('#btnCancelTxQuickAccount');
         const btnSaveQuickAccount = document.querySelector('#btnSaveTxQuickAccount');
 
-        const quickAccountCode = document.querySelector('#txQuickAccountCode');
-        const quickAccountName = document.querySelector('#txQuickAccountName');
-        const quickAccountType = document.querySelector('#txQuickAccountType');
+        const quickAccountPrefix = document.querySelector("#quickAccountPrefix");
+        const quickAccountName = document.querySelector("#quickAccountName");
+        const quickAccountTypePreview = document.querySelector("#quickAccountTypePreview");
 
         let transactions = [];
+        let accounts = [];
         let selectedIndex = null;
         let editingTxIndex = null;
         let txPage = 1;
@@ -650,6 +754,7 @@
         let detailPage = 1;
         let detailPageSize = 10;
         let pendingAccountLineIndex = null;
+        let quickAccountPrefixRules = [];
 
         // ---------- loading ----------
         async function loadAll() {
@@ -745,11 +850,16 @@
         }
 
         function normalizeTx(tx) {
+            const entries = Array.isArray(tx.Entries ?? tx.entries)
+                ? (tx.Entries ?? tx.entries).map(normalizeEntry)
+                : [];
+
             return {
                 transactionNo: tx.TransactionNo ?? tx.transactionNo ?? null,
                 txnDate: tx.TxnDate ?? tx.txnDate ?? null,
                 description: tx.Description ?? tx.description ?? "",
-                entries: Array.isArray(tx.Entries ?? tx.entries) ? (tx.Entries ?? tx.entries).map(normalizeEntry) : [],
+                entries,
+                hasError: Boolean(tx.HasError ?? tx.hasError ?? entries.some(e => e.hasError)),
                 _mode: "view",
                 _selected: false,
                 _orig: null
@@ -757,11 +867,15 @@
         }
 
         function normalizeEntry(e) {
+            const debit = Number(e.Debit ?? e.debit ?? 0) || 0;
+            const credit = Number(e.Credit ?? e.credit ?? 0) || 0;
+
             return {
                 accountCode: (e.AccountCode ?? e.accountCode ?? "").toString(),
-                debit: Number(e.Debit ?? e.debit ?? 0) || 0,
-                credit: Number(e.Credit ?? e.credit ?? 0) || 0,
-                memo: (e.Memo ?? e.memo ?? "").toString()
+                debit,
+                credit,
+                memo: (e.Memo ?? e.memo ?? "").toString(),
+                hasError: Boolean(e.HasError ?? e.hasError ?? false) || (debit === 0 && credit === 0)
             };
         }
 
@@ -806,6 +920,30 @@
             }
         }
 
+        async function loadQuickAccountPrefixRules() {
+            if (quickAccountPrefixRules.length) return quickAccountPrefixRules;
+
+            quickAccountPrefixRules = await API.getAccountPrefixRulesForAccounts(companyId);
+
+            quickAccountPrefixRules = (quickAccountPrefixRules || []).map(r => ({
+                prefix: r.prefix ?? r.Prefix ?? "",
+                accountType: r.accountType ?? r.AccountType ?? ""
+            }));
+
+            if (quickAccountPrefix) {
+                quickAccountPrefix.innerHTML = `
+            <option value="">Select prefix...</option>
+            ${quickAccountPrefixRules.map(rule => `
+                <option value="${escapeHtml(rule.prefix)}">
+                    ${escapeHtml(rule.prefix)} - ${escapeHtml(rule.accountType)}
+                </option>
+            `).join("")}
+        `;
+            }
+
+            return quickAccountPrefixRules;
+        }
+
         // ---------- master render ----------
         function renderMaster() {
             const viewRows = filteredIndexes();
@@ -838,14 +976,19 @@
         function txRowHtml(row, index) {
             const isSelected = selectedIndex === index;
             const isEditing = row._mode === "edit" || row._mode === "new";
+            const hasError = Boolean(row.hasError || row.entries.some(line => line.hasError));
 
             const baseClasses =
                 "hover:bg-gray-50 dark:hover:bg-neutral-800/60 cursor-pointer";
             const selectedClass = isSelected ? " bg-indigo-50/60 dark:bg-indigo-900/40" : "";
             const editingClass = isEditing ? " border-l-2 border-indigo-500" : "";
+            const errorClass = hasError ? " border-l-2 border-red-500" : "";
+            const statusHtml = hasError
+                ? `<span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:bg-red-950/50 dark:text-red-200">Error</span>`
+                : `<span class="text-xs text-gray-400 dark:text-neutral-500"></span>`;
 
             return `
-              <tr data-index="${index}" class="${baseClasses}${selectedClass}${editingClass}">
+              <tr data-index="${index}" class="${baseClasses}${selectedClass}${editingClass}${errorClass}">
                 <td class="px-3 py-2">
                   <input type="checkbox"
                          class="h-4 w-4 rounded border-gray-300 dark:border-neutral-600 tx-select"
@@ -865,6 +1008,9 @@
                 </td>
                 <td class="px-3 py-2">
                   ${escapeHtml(row.description || "")}
+                </td>
+                <td class="px-3 py-2">
+                  ${statusHtml}
                 </td>
                 <td class="px-3 py-2 text-right space-x-2">
                   <button type="button"
@@ -911,7 +1057,7 @@
                 if (linesBody) {
                     linesBody.innerHTML = `
               <tr>
-                <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+                <td colspan="7" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
                   No transaction selected.
                 </td>
               </tr>
@@ -956,7 +1102,7 @@
             if (!tx.entries.length && !isEditing) {
                 linesBody.innerHTML = `
             <tr>
-              <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
+              <td colspan="7" class="px-4 py-4 text-center text-gray-500 dark:text-neutral-400">
                 This transaction has no lines.
               </td>
             </tr>
@@ -990,6 +1136,11 @@
         function lineRowHtml(line, idx, editable) {
             const debit = Number(line.debit) || 0;
             const credit = Number(line.credit) || 0;
+            const hasError = Boolean(line.hasError);
+            const rowClass = hasError ? "bg-red-50/60 dark:bg-red-950/20" : "";
+            const statusHtml = hasError
+                ? `<span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:bg-red-950/50 dark:text-red-200">Error</span>`
+                : `<span class="text-xs text-gray-400 dark:text-neutral-500"></span>`;
 
             const options = accounts.map(a => `
               <option value="${escapeHtml(a.code)}"
@@ -1000,7 +1151,7 @@
 
                     if (!editable) {
                         return `
-                    <tr>
+                    <tr class="${rowClass}">
                       <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                       <td class="px-4 py-2">
                         <div class="font-mono text-xs">
@@ -1008,16 +1159,17 @@
                             ${escapeHtml(line.accountCode || "")}
                         </a></div>
                       </td>
-                      <td class="px-4 py-2 text-right font-mono text-xs">${debit ? escapeHtml(debit.toFixed(2)) : "&nbsp;"}</td>
-                      <td class="px-4 py-2 text-left font-mono text-xs">${credit ? escapeHtml(credit.toFixed(2)) : "&nbsp;"}</td>
+                      <td class="px-4 py-2 text-right font-mono text-xs">${escapeHtml(debit.toFixed(2))}</td>
+                      <td class="px-4 py-2 text-left font-mono text-xs">${escapeHtml(credit.toFixed(2))}</td>
                       <td class="px-4 py-2 text-xs text-gray-600 dark:text-neutral-300">${escapeHtml(line.memo || "")}</td>
+                      <td class="px-4 py-2">${statusHtml}</td>
                       <td class="px-4 py-2 text-right"></td>
                     </tr>
                   `;
                     }
 
                     return `
-                  <tr data-line-index="${idx}" class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                  <tr data-line-index="${idx}" class="hover:bg-gray-50 dark:hover:bg-neutral-800/60 ${rowClass}">
                     <td class="px-4 py-2 text-xs text-gray-500 dark:text-neutral-400">${idx + 1}</td>
                     <td class="px-4 py-2">
                       <select data-field="accountCode"
@@ -1034,7 +1186,7 @@
                              step="0.01"
                              class="w-24 rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
                                     px-2 py-1 text-xs text-right font-mono"
-                             value="${debit ? escapeHtml(debit.toString()) : ""}" />
+                             value="${escapeHtml(debit.toString())}" />
                     </td>
                     <td class="px-4 py-2 text-right">
                       <input data-field="credit"
@@ -1042,7 +1194,7 @@
                              step="0.01"
                              class="w-24 rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
                                     px-2 py-1 text-xs text-left font-mono"
-                             value="${credit ? escapeHtml(credit.toString()) : ""}" />
+                             value="${escapeHtml(credit.toString())}" />
                     </td>
                     <td class="px-4 py-2">
                       <input data-field="memo"
@@ -1050,6 +1202,7 @@
                                     px-2 py-1 text-xs"
                              value="${escapeHtml(line.memo || "")}" />
                     </td>
+                    <td class="px-4 py-2">${statusHtml}</td>
                     <td class="px-4 py-2 text-right">
                       <button type="button"
                               data-action="remove-line"
@@ -1229,17 +1382,32 @@
             return max > 0 ? max + 1 : 1;
         }
 
-        function openQuickAccountModal(lineIndex) {
+        async function openQuickAccountModal(lineIndex) {
             pendingAccountLineIndex = lineIndex;
 
-            if (quickAccountCode) quickAccountCode.value = "";
-            if (quickAccountName) quickAccountName.value = "";
-            if (quickAccountType) quickAccountType.value = "";
+            try {
+                await loadQuickAccountPrefixRules();
 
-            quickAccountModal?.classList.remove("hidden");
-            quickAccountModal?.classList.add("flex");
+                if (!quickAccountPrefixRules.length) {
+                    alert("No prefix rules found. Please ask an admin to create prefix rules first.");
+                    pendingAccountLineIndex = null;
+                    return;
+                }
 
-            setTimeout(() => quickAccountCode?.focus(), 0);
+                if (quickAccountPrefix) quickAccountPrefix.value = "";
+                if (quickAccountName) quickAccountName.value = "";
+                if (quickAccountTypePreview) {
+                    quickAccountTypePreview.textContent = "Account type comes from selected prefix.";
+                }
+
+                quickAccountModal?.classList.remove("hidden");
+                quickAccountModal?.classList.add("flex");
+
+                setTimeout(() => quickAccountPrefix?.focus(), 0);
+            } catch (err) {
+                pendingAccountLineIndex = null;
+                alert(err.message || "Failed to load prefix rules.");
+            }
         }
 
         function closeQuickAccountModal() {
@@ -1249,64 +1417,49 @@
         }
 
         async function saveQuickAccountFromModal() {
-            const code = (quickAccountCode?.value || "").trim();
+            const prefix = (quickAccountPrefix?.value || "").trim().toUpperCase();
             const name = (quickAccountName?.value || "").trim();
-            const type = (quickAccountType?.value || "").trim();
 
-            if (!code) {
-                showAlert(alertHost, "danger", "Account code is required.");
-                quickAccountCode?.focus();
+            if (!prefix) {
+                alert("Prefix is required.");
+                quickAccountPrefix?.focus();
                 return;
             }
 
             if (!name) {
-                showAlert(alertHost, "danger", "Account name is required.");
+                alert("Account name is required.");
                 quickAccountName?.focus();
                 return;
             }
 
-            if (!type) {
-                showAlert(alertHost, "danger", "Account type is required.");
-                quickAccountType?.focus();
-                return;
-            }
-
             try {
-                const created = await API.createAccount(companyId, {
-                    accountCode: code,
+                const created = await API.createAccountFromPrefix(companyId, {
+                    prefix,
                     name,
-                    type,
                     isActive: true
                 });
 
-                const createdCode = created?.accountCode ?? created?.AccountCode ?? code;
-                const createdName = created?.name ?? created?.Name ?? name;
+                await loadAccounts();
 
-                const exists = accounts.some(a => a.code === createdCode);
-                if (!exists) {
-                    accounts.push({
-                        code: createdCode,
-                        name: createdName
-                    });
-
-                    accounts.sort((a, b) =>
-                        String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: "base" })
-                    );
-                }
-
-                if (selectedIndex != null && pendingAccountLineIndex != null) {
+                if (
+                    selectedIndex != null &&
+                    pendingAccountLineIndex != null &&
+                    created?.accountCode
+                ) {
                     const tx = transactions[selectedIndex];
-                    const line = tx?.entries?.[pendingAccountLineIndex];
+                    const line = tx?.entries[pendingAccountLineIndex];
+
                     if (line) {
-                        line.accountCode = createdCode;
+                        line.accountCode = created.accountCode;
                     }
                 }
 
                 closeQuickAccountModal();
                 renderDetail(selectedIndex);
-                showAlert(alertHost, "success", `Account ${createdCode} created.`);
+
+                showAlert(alertHost, "success", "Account created.");
             } catch (err) {
-                showAlert(alertHost, "danger", "Failed to create account: " + err.message);
+                alert(err.message || "Failed to create account.");
             }
         }
 
@@ -1445,7 +1598,6 @@
 
         // detail lines events
         if (linesBody) {
-
             function handleLineChange(e) {
                 const tr = e.target.closest("tr[data-line-index]");
                 if (!tr || selectedIndex == null) return;
@@ -1526,6 +1678,18 @@
             }
         });
 
+        quickAccountPrefix?.addEventListener("change", () => {
+            const selectedPrefix = quickAccountPrefix.value;
+
+            const selectedRule = quickAccountPrefixRules.find(r => r.prefix === selectedPrefix);
+
+            if (quickAccountTypePreview) {
+                quickAccountTypePreview.textContent = selectedRule
+                    ? `Account type: ${selectedRule.accountType}`
+                    : "Account type comes from selected prefix.";
+            }
+        });
+
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape" && quickAccountModal && !quickAccountModal.classList.contains("hidden")) {
                 closeQuickAccountModal();
@@ -1558,6 +1722,7 @@
         const txNoParsed = transactionNo0 != null && transactionNo0 !== ""
             ? Number(transactionNo0)
             : null;
+        const tfoot = document.querySelector('#ledgerTotalsBody');
 
         if (input) input.value = q0;
 
@@ -1588,6 +1753,7 @@
                   <tr>
                     <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
                   </tr>`;
+                if (tfoot) tfoot.innerHTML = "";
                 return;
             }
 
@@ -1595,6 +1761,18 @@
                 const v = Number(n || 0);
                 return v ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
             };
+
+            const moneyZero = (n) => {
+                const v = Number(n || 0);
+                return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+
+            const totalDebit = results.reduce((sum, r) => sum + Number(r.debit || 0), 0);
+            const totalCredit = results.reduce((sum, r) => sum + Number(r.credit || 0), 0);
+
+            const net = totalDebit - totalCredit;
+            const netDebit = net > 0 ? net : 0;
+            const netCredit = net < 0 ? Math.abs(net) : 0;
 
             tbody.innerHTML = results.map(r => {
                 const txNo = r.transactionNo;
@@ -1627,7 +1805,19 @@
                         <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
                         <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
                     </tr>`;
-                        }).join("");
+                }).join("");
+
+            tfoot.innerHTML = `
+                <tr class="font-semibold">
+                    <td class="px-4 py-3 text-right" colspan="5">Total</td>
+                    <td class="px-4 py-3 text-right font-mono">${escapeHtml(moneyZero(totalDebit))}</td>
+                    <td class="px-4 py-3 text-left font-mono">${escapeHtml(moneyZero(totalCredit))}</td>
+                </tr>
+                <tr class="font-semibold border-t border-gray-200 dark:border-neutral-800">
+                    <td class="px-4 py-3 text-right" colspan="5">Net Total</td>
+                    <td class="px-4 py-3 text-right font-mono">${escapeHtml(moneyZero(netDebit))}</td>
+                    <td class="px-4 py-3 text-left font-mono">${escapeHtml(moneyZero(netCredit))}</td>
+                </tr>`;
         }
 
         // Button actions
@@ -1644,7 +1834,14 @@
                 runSearch({ q });
             });
         }
-
+        if (input) {
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    btnSearch?.click();
+                }
+            });
+        }
         if (btnClear) {
             btnClear.addEventListener("click", () => {
                 if (input) input.value = "";
@@ -1665,14 +1862,724 @@
         }
     }
 
+    // ---------- Admin Page ----------
+    function initAdminIndex() {
+        initAdminLogs();
+        initAdminPrefixRules();
+        initAdminUsers();
+    }
+
+    function initAdminLogs() {
+        const tbody = document.querySelector("#adminLogsTableBody");
+        const pagerHost = document.querySelector("#adminLogsPager");
+        const searchInput = document.querySelector("#adminLogsSearch");
+        const levelSelect = document.querySelector("#adminLogsLevel");
+        const eventTypeInput = document.querySelector("#adminLogsEventType");
+        const refreshBtn = document.querySelector("#btnRefreshLogs");
+
+        if (!tbody) return;
+
+        let currentPage = 1;
+        const pageSize = 50;
+        let searchTimer = null;
+
+        async function loadLogs() {
+            try {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        Loading logs...
+                    </td>
+                </tr>
+            `;
+
+                const result = await API.getLogs({
+                    q: (searchInput?.value || "").trim(),
+                    level: (levelSelect?.value || "").trim(),
+                    eventType: (eventTypeInput?.value || "").trim(),
+                    page: currentPage,
+                    pageSize
+                });
+
+                const items = result.items || result.Items || [];
+                const totalCount = result.totalCount ?? result.TotalCount ?? 0;
+
+                renderLogs(items);
+                renderPager(pagerHost, currentPage, pageSize, totalCount, (nextPage) => {
+                    currentPage = nextPage;
+                    loadLogs();
+                });
+            } catch (err) {
+                console.error("Failed to load admin logs", err);
+
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-red-500">
+                        Failed to load logs: ${escapeHtml(err.message || "Unknown error")}
+                    </td>
+                </tr>
+            `;
+
+                if (pagerHost) pagerHost.innerHTML = "";
+            }
+        }
+
+        function renderLogs(items) {
+            if (!items.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        No logs found.
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = items.map(log => {
+                const tsUtc = log.tsUtc || log.TsUtc || "";
+                const level = log.level || log.Level || "";
+                const eventType = log.eventType || log.EventType || "";
+                const logCode = log.logCode || log.LogCode || "";
+                const logMessage = log.logMessage || log.LogMessage || "";
+                const sourceFile = log.sourceFile || log.SourceFile || "";
+                const sourceFunction = log.sourceFunction || log.SourceFunction || "";
+
+                const source = [sourceFile, sourceFunction]
+                    .filter(Boolean)
+                    .join(" / ");
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                    <td class="px-3 py-3 whitespace-nowrap text-gray-500 dark:text-neutral-400">
+                        ${escapeHtml(formatDateTime(tsUtc))}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                        ${renderLogLevelBadge(level)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                        ${escapeHtml(eventType)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap font-mono text-[11px]">
+                        ${escapeHtml(logCode)}
+                    </td>
+                    <td class="px-3 py-3">
+                        ${escapeHtml(logMessage)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap text-gray-500 dark:text-neutral-400">
+                        ${escapeHtml(source)}
+                    </td>
+                </tr>
+            `;
+            }).join("");
+        }
+
+        function reloadFromFirstPage() {
+            currentPage = 1;
+            loadLogs();
+        }
+
+        refreshBtn?.addEventListener("click", reloadFromFirstPage);
+
+        levelSelect?.addEventListener("change", reloadFromFirstPage);
+
+        searchInput?.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(reloadFromFirstPage, 300);
+        });
+
+        eventTypeInput?.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(reloadFromFirstPage, 300);
+        });
+
+        loadLogs();
+    }
+
+    function renderLogLevelBadge(level) {
+        const normalized = (level || "").toUpperCase();
+
+        let cls = "bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-neutral-200";
+
+        if (normalized === "ERROR") {
+            cls = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+        } else if (normalized === "WARN" || normalized === "WARNING") {
+            cls = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
+        } else if (normalized === "INFO") {
+            cls = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+        }
+
+        return `
+        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}">
+            ${escapeHtml(level || "-")}
+        </span>
+    `;
+    }
+
+    function formatDateTime(value) {
+        if (!value) return "";
+
+        const d = new Date(value);
+
+        if (Number.isNaN(d.getTime())) {
+            return value;
+        }
+
+        return d.toLocaleString();
+    }
+
+    function initAdminPrefixRules() {
+        const tbody = document.querySelector("#prefixRulesTableBody");
+        const addBtn = document.querySelector("#btnAddPrefixRule");
+
+        const modal = document.querySelector("#prefixRuleModal");
+        const modalTitle = document.querySelector("#prefixRuleModalTitle");
+        const form = document.querySelector("#prefixRuleForm");
+        const modeInput = document.querySelector("#prefixRuleMode");
+        const prefixInput = document.querySelector("#prefixRulePrefix");
+        const accountTypeSelect = document.querySelector("#prefixRuleAccountType");
+        const errorBox = document.querySelector("#prefixRuleError");
+        const saveBtn = document.querySelector("#btnSavePrefixRule");
+        const closeBtn = document.querySelector("#btnClosePrefixRuleModal");
+        const cancelBtn = document.querySelector("#btnCancelPrefixRuleModal");
+
+        let accountTypes = [];
+        let editingPrefix = "";
+
+        if (!tbody) return;
+
+        async function loadAccountTypes() {
+            if (accountTypes.length) return accountTypes;
+
+            accountTypes = await API.getAccountTypes();
+
+            accountTypeSelect.innerHTML = `
+            <option value="">Select account type</option>
+            ${(accountTypes || []).map(type => `
+                <option value="${escapeHtml(type)}">${escapeHtml(type)}</option>
+            `).join("")}
+        `;
+
+            return accountTypes;
+        }
+
+        function showPrefixRuleError(message) {
+            if (!errorBox) return;
+
+            errorBox.textContent = message || "";
+            errorBox.classList.toggle("hidden", !message);
+        }
+
+        function openPrefixRuleModal(mode, rule = null) {
+            showPrefixRuleError("");
+
+            const isEdit = mode === "edit";
+            editingPrefix = isEdit ? (rule?.prefix || "") : "";
+
+            modeInput.value = mode;
+            modalTitle.textContent = isEdit ? "Edit Prefix Rule" : "New Prefix Rule";
+
+            prefixInput.value = isEdit ? (rule?.prefix || "") : "";
+            prefixInput.disabled = isEdit;
+
+            accountTypeSelect.value = isEdit ? (rule?.accountType || "") : "";
+
+            saveBtn.textContent = isEdit ? "Save Changes" : "Create Rule";
+
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+
+            setTimeout(() => {
+                if (isEdit) {
+                    accountTypeSelect.focus();
+                } else {
+                    prefixInput.focus();
+                }
+            }, 0);
+        }
+
+        function closePrefixRuleModal() {
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+
+            form.reset();
+            prefixInput.disabled = false;
+            editingPrefix = "";
+            showPrefixRuleError("");
+        }
+
+        async function loadPrefixRules() {
+            try {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        Loading prefix rules...
+                    </td>
+                </tr>
+            `;
+
+                const rules = await API.getAccountPrefixRules();
+                renderPrefixRules(rules || []);
+            } catch (err) {
+                console.error("Failed to load prefix rules", err);
+
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="px-4 py-6 text-center text-red-500">
+                        Failed to load prefix rules: ${escapeHtml(err.message || "Unknown error")}
+                    </td>
+                </tr>
+            `;
+            }
+        }
+
+        function renderPrefixRules(rules) {
+            if (!rules.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        No prefix rules found.
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = rules.map(rule => {
+                const prefix = rule.prefix || rule.Prefix || "";
+                const accountType = rule.accountType || rule.AccountType || "";
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                    <td class="px-4 py-3 font-mono font-semibold">
+                        ${escapeHtml(prefix)}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${escapeHtml(accountType)}
+                    </td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <button type="button"
+                                class="btn-edit-prefix-rule inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                                       px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                                       hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                data-prefix="${escapeHtml(prefix)}"
+                                data-account-type="${escapeHtml(accountType)}">
+                            <i class="fa-solid fa-pen mr-1"></i>
+                            Edit
+                        </button>
+
+                        <button type="button"
+                                class="btn-delete-prefix-rule ml-2 inline-flex items-center rounded-lg border border-red-200 dark:border-red-900/60
+                                       px-3 py-1.5 text-xs text-red-600 dark:text-red-300
+                                       hover:bg-red-50 dark:hover:bg-red-900/20"
+                                data-prefix="${escapeHtml(prefix)}">
+                            <i class="fa-solid fa-trash mr-1"></i>
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join("");
+        }
+
+        addBtn?.addEventListener("click", async () => {
+            try {
+                await loadAccountTypes();
+                openPrefixRuleModal("create");
+            } catch (err) {
+                alert(err.message || "Failed to load account types.");
+            }
+        });
+
+        closeBtn?.addEventListener("click", closePrefixRuleModal);
+        cancelBtn?.addEventListener("click", closePrefixRuleModal);
+
+        modal?.addEventListener("click", (e) => {
+            if (e.target === modal) {
+                closePrefixRuleModal();
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+                closePrefixRuleModal();
+            }
+        });
+
+        form?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const mode = modeInput.value;
+            const cleanPrefix = prefixInput.value.trim().toUpperCase();
+            const cleanAccountType = accountTypeSelect.value.trim();
+
+            if (!cleanPrefix) {
+                showPrefixRuleError("Prefix is required.");
+                prefixInput.focus();
+                return;
+            }
+
+            if (!cleanAccountType) {
+                showPrefixRuleError("Account type is required.");
+                accountTypeSelect.focus();
+                return;
+            }
+
+            saveBtn.disabled = true;
+            showPrefixRuleError("");
+
+            try {
+                if (mode === "edit") {
+                    await API.updateAccountPrefixRule(editingPrefix, {
+                        prefix: editingPrefix,
+                        accountType: cleanAccountType
+                    });
+                } else {
+                    await API.createAccountPrefixRule({
+                        prefix: cleanPrefix,
+                        accountType: cleanAccountType
+                    });
+                }
+
+                closePrefixRuleModal();
+                await loadPrefixRules();
+            } catch (err) {
+                showPrefixRuleError(err.message || "Failed to save prefix rule.");
+            } finally {
+                saveBtn.disabled = false;
+            }
+        });
+
+        tbody.addEventListener("click", async (e) => {
+            const editBtn = e.target.closest(".btn-edit-prefix-rule");
+            const deleteBtn = e.target.closest(".btn-delete-prefix-rule");
+
+            if (editBtn) {
+                const prefix = editBtn.dataset.prefix || "";
+                const accountType = editBtn.dataset.accountType || "";
+
+                try {
+                    await loadAccountTypes();
+                    openPrefixRuleModal("edit", {
+                        prefix,
+                        accountType
+                    });
+                } catch (err) {
+                    alert(err.message || "Failed to load account types.");
+                }
+
+                return;
+            }
+
+            if (deleteBtn) {
+                const prefix = deleteBtn.dataset.prefix || "";
+
+                const ok = confirm(
+                    `Delete prefix rule '${prefix}'?\n\nThis will not delete accounts, but new account type auto-detection may no longer recognise this prefix.`
+                );
+
+                if (!ok) return;
+
+                try {
+                    await API.deleteAccountPrefixRule(prefix);
+                    await loadPrefixRules();
+                } catch (err) {
+                    alert(err.message || "Failed to delete prefix rule.");
+                }
+            }
+        });
+
+        loadPrefixRules();
+    }
+
+    function initAdminUsers() {
+        const tbody = document.querySelector("#adminUsersTableBody");
+        const addBtn = document.querySelector("#btnAddUser");
+
+        if (!tbody) return;
+
+        async function loadUsers() {
+            try {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        Loading users...
+                    </td>
+                </tr>
+            `;
+
+                const users = await API.getAdminUsers();
+                renderUsers(users || []);
+            } catch (err) {
+                console.error("Failed to load users", err);
+
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-red-500">
+                        Failed to load users: ${escapeHtml(err.message || "Unknown error")}
+                    </td>
+                </tr>
+            `;
+            }
+        }
+
+        function renderUsers(users) {
+            if (!users.length) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                        No users found.
+                    </td>
+                </tr>
+            `;
+                return;
+            }
+
+            tbody.innerHTML = users.map(user => {
+                const id = user.id ?? user.Id;
+                const email = user.email || user.Email || "";
+                const isAdmin = user.isAdmin ?? user.IsAdmin ?? false;
+                const isActive = user.isActive ?? user.IsActive ?? false;
+                const lastLoginAtUtc = user.lastLoginAtUtc || user.LastLoginAtUtc || "";
+
+                return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
+                    <td class="px-4 py-3 font-mono text-xs">
+                        ${escapeHtml(String(id))}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${escapeHtml(email)}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${renderBoolBadge(isAdmin, "Admin", "User")}
+                    </td>
+                    <td class="px-4 py-3">
+                        ${renderBoolBadge(isActive, "Active", "Inactive")}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-neutral-400">
+                        ${escapeHtml(formatDateTime(lastLoginAtUtc))}
+                    </td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <button type="button"
+                                class="btn-edit-admin-user inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                                       px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                                       hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                data-id="${escapeHtml(String(id))}"
+                                data-email="${escapeHtml(email)}"
+                                data-is-admin="${isAdmin ? "true" : "false"}"
+                                data-is-active="${isActive ? "true" : "false"}">
+                            <i class="fa-solid fa-pen mr-1"></i>
+                            Edit
+                        </button>
+
+                        <button type="button"
+                                class="btn-reset-admin-user-password ml-2 inline-flex items-center rounded-lg border border-gray-200 dark:border-neutral-700
+                                       px-3 py-1.5 text-xs text-gray-700 dark:text-neutral-100
+                                       hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                data-id="${escapeHtml(String(id))}"
+                                data-email="${escapeHtml(email)}">
+                            <i class="fa-solid fa-key mr-1"></i>
+                            Password
+                        </button>
+
+                        <button type="button"
+                                class="btn-delete-admin-user ml-2 inline-flex items-center rounded-lg border border-red-200 dark:border-red-900/60
+                                       px-3 py-1.5 text-xs text-red-600 dark:text-red-300
+                                       hover:bg-red-50 dark:hover:bg-red-900/20"
+                                data-id="${escapeHtml(String(id))}"
+                                data-email="${escapeHtml(email)}">
+                            <i class="fa-solid fa-trash mr-1"></i>
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join("");
+        }
+
+        addBtn?.addEventListener("click", async () => {
+            const email = prompt("Enter user email:");
+
+            if (email === null) return;
+
+            const cleanEmail = email.trim().toLowerCase();
+
+            if (!cleanEmail) {
+                alert("Email is required.");
+                return;
+            }
+
+            const password = prompt("Enter initial password:");
+
+            if (password === null) return;
+
+            if (!password.trim()) {
+                alert("Password is required.");
+                return;
+            }
+
+            const isAdmin = confirm("Should this user be an admin?");
+
+            try {
+                await API.createAdminUser({
+                    email: cleanEmail,
+                    password,
+                    isAdmin,
+                    isActive: true
+                });
+
+                await loadUsers();
+            } catch (err) {
+                alert(err.message || "Failed to create user.");
+            }
+        });
+
+        tbody.addEventListener("click", async (e) => {
+            const editBtn = e.target.closest(".btn-edit-admin-user");
+            const resetBtn = e.target.closest(".btn-reset-admin-user-password");
+            const deleteBtn = e.target.closest(".btn-delete-admin-user");
+
+            if (editBtn) {
+                const id = editBtn.dataset.id;
+                const currentEmail = editBtn.dataset.email || "";
+                const currentIsAdmin = editBtn.dataset.isAdmin === "true";
+                const currentIsActive = editBtn.dataset.isActive === "true";
+
+                const email = prompt("Edit email:", currentEmail);
+
+                if (email === null) return;
+
+                const cleanEmail = email.trim().toLowerCase();
+
+                if (!cleanEmail) {
+                    alert("Email is required.");
+                    return;
+                }
+
+                const isAdmin = confirm(
+                    currentIsAdmin
+                        ? "Keep this user as admin?\n\nOK = Admin, Cancel = Normal user"
+                        : "Make this user admin?\n\nOK = Admin, Cancel = Normal user"
+                );
+
+                const isActive = confirm(
+                    currentIsActive
+                        ? "Keep this user active?\n\nOK = Active, Cancel = Inactive"
+                        : "Activate this user?\n\nOK = Active, Cancel = Inactive"
+                );
+
+                try {
+                    await API.updateAdminUser(id, {
+                        email: cleanEmail,
+                        isAdmin,
+                        isActive
+                    });
+
+                    await loadUsers();
+                } catch (err) {
+                    alert(err.message || "Failed to update user.");
+                }
+
+                return;
+            }
+
+            if (resetBtn) {
+                const id = resetBtn.dataset.id;
+                const email = resetBtn.dataset.email || "";
+
+                const password = prompt(`Enter new password for ${email}:`);
+
+                if (password === null) return;
+
+                if (!password.trim()) {
+                    alert("Password is required.");
+                    return;
+                }
+
+                try {
+                    await API.resetAdminUserPassword(id, {
+                        password
+                    });
+
+                    alert("Password updated.");
+                } catch (err) {
+                    alert(err.message || "Failed to reset password.");
+                }
+
+                return;
+            }
+
+            if (deleteBtn) {
+                const id = deleteBtn.dataset.id;
+                const email = deleteBtn.dataset.email || "";
+
+                const ok = confirm(
+                    `Delete user '${email}'?\n\nThis cannot be undone.`
+                );
+
+                if (!ok) return;
+
+                try {
+                    await API.deleteAdminUser(id);
+                    await loadUsers();
+                } catch (err) {
+                    alert(err.message || "Failed to delete user.");
+                }
+            }
+        });
+
+        loadUsers();
+    }
+
+    function renderBoolBadge(value, trueText, falseText) {
+        if (value) {
+            return `
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700
+                         dark:bg-green-900/30 dark:text-green-300">
+                ${escapeHtml(trueText)}
+            </span>
+        `;
+        }
+
+        return `
+        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700
+                     dark:bg-neutral-800 dark:text-neutral-200">
+            ${escapeHtml(falseText)}
+        </span>
+    `;
+    }
+
     // ---------- helpers ----------
     function showAlert(host, type, msg) {
         if (!host) return;
-        const div = document.createElement("div");
-        div.className = `alert ${type === "success" ? "alert-success" : "alert-danger"}`;
-        div.textContent = msg;
-        host.appendChild(div);
-        setTimeout(() => div.remove(), 4000);
+
+        if (host._alertTimer) {
+            clearTimeout(host._alertTimer);
+        }
+
+        const existingMessages = new Set(
+            Array.from(host.querySelectorAll("[data-alert-message]"))
+                .map(x => x.dataset.alertMessage)
+        );
+
+        if (!existingMessages.has(msg)) {
+            const div = document.createElement("div");
+
+            div.className =
+                type === "success"
+                    ? "pointer-events-auto rounded-lg border border-green-700 bg-green-950 px-3 py-2 text-xs text-green-100 shadow-lg"
+                    : "pointer-events-auto rounded-lg border border-red-700 bg-red-950 px-3 py-2 text-xs text-red-100 shadow-lg";
+
+            div.dataset.alertMessage = msg;
+            div.textContent = msg;
+
+            host.appendChild(div);
+        }
+
+        host._alertTimer = setTimeout(() => {
+            host.innerHTML = "";
+            host._alertTimer = null;
+        }, 4000);
     }
 
     function formatDate(value) {
@@ -1701,6 +2608,4 @@
             t = setTimeout(() => fn(...args), ms);
         };
     }
-
-    function qs(sel) { return document.querySelector(sel); }
 })();

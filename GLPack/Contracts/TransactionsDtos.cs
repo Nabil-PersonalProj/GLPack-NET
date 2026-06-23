@@ -8,6 +8,7 @@
             public decimal Debit { get; init; }
             public decimal Credit { get; init; }
             public string? Memo { get; init; }
+            public bool HasError { get; init; }
         }
 
         public sealed class TransactionCreateDto

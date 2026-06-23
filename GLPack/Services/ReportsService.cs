@@ -22,7 +22,7 @@ namespace GLPack.Services
         public async Task<(List<TrialBalanceRow> Rows, decimal TotalDebit, decimal TotalCredit)>
             GetTrialBalanceAsync(int companyId, CancellationToken ct)
         {
-            var rows = await _db.TransactionEntries
+            List<TrialBalanceRow> rows = await _db.TransactionEntries
                 .Where(e => e.CompanyId == companyId)
                 .GroupBy(e => new { e.AccountCode, e.Account.Name, e.Account.Type })
                 .Select(g => new TrialBalanceRow
@@ -44,8 +44,8 @@ namespace GLPack.Services
                 .OrderBy(r => r.AccountCode)
                 .ToListAsync(ct);
 
-            var totalDebit = rows.Sum(r => r.Debit);
-            var totalCredit = rows.Sum(r => r.Credit);
+            decimal totalDebit = rows.Sum(r => r.Debit);
+            decimal totalCredit = rows.Sum(r => r.Credit);
 
             return (rows, totalDebit, totalCredit);
         }
@@ -53,58 +53,36 @@ namespace GLPack.Services
         public async Task<List<ProfitLossRowVm>>
             GetProfitAndLossAsync(int companyId, CancellationToken ct)
         {
-            var entries = await _db.TransactionEntries
-                .Where(e => e.CompanyId == companyId)
-                .Select(e => new
-                {
-                    e.AccountCode,
-                    AccountName = e.Account.Name,
-                    AccountType = e.Account.Type,
-                    e.Debit,
-                    e.Credit
-                })
-                .ToListAsync(ct);
+            List<AccountReportTotal> grouped = await GetAccountReportTotalsAsync(companyId, ct);
 
-            var grouped = entries
-                .GroupBy(e => new { e.AccountCode, e.AccountName, e.AccountType })
-                .Select(g => new
-                {
-                    g.Key.AccountCode,
-                    g.Key.AccountName,
-                    g.Key.AccountType,
-                    TotalDebit = g.Sum(x => x.Debit),
-                    TotalCredit = g.Sum(x => x.Credit)
-                })
-                .ToList();
-
-            var rows = new List<ProfitLossRowVm>();
+            List<ProfitLossRowVm> rows = new List<ProfitLossRowVm>();
             decimal salesTotal = 0m;
             decimal costOfSalesTotal = 0m;
             decimal expensesTotal = 0m;
             decimal balanceBroughtDown = 0m;
 
-            var salesLines = new List<ProfitLossRowVm>();
-            var costLines = new List<ProfitLossRowVm>();
-            var expenseLines = new List<ProfitLossRowVm>();
-            var plLines = new List<ProfitLossRowVm>();
+            List<ProfitLossRowVm> salesLines = new List<ProfitLossRowVm>();
+            List<ProfitLossRowVm> costLines = new List<ProfitLossRowVm>();
+            List<ProfitLossRowVm> expenseLines = new List<ProfitLossRowVm>();
+            List<ProfitLossRowVm> plLines = new List<ProfitLossRowVm>();
 
-            foreach (var a in grouped)
+            foreach (AccountReportTotal account in grouped)
             {
-                var debit = a.TotalDebit;
-                var credit = a.TotalCredit;
-                var accountType = (a.AccountType ?? "").Trim();
-                var accountCode = (a.AccountCode ?? "").Trim();
+                decimal debit = account.TotalDebit;
+                decimal credit = account.TotalCredit;
+                string accountType = (account.AccountType ?? "").Trim();
+                string accountCode = (account.AccountCode ?? "").Trim();
 
                 if (accountType.Equals("Sales", StringComparison.OrdinalIgnoreCase))
                 {
-                    var amount = credit - debit;
+                    decimal amount = credit - debit;
                     if (amount != 0)
                     {
                         salesLines.Add(new ProfitLossRowVm
                         {
                             RowType = "Account",
                             Code = accountCode,
-                            Description = a.AccountName,
+                            Description = account.AccountName,
                             Amount = amount
                         });
                         salesTotal += amount;
@@ -114,14 +92,14 @@ namespace GLPack.Services
                     accountType.Equals("Cost of Sale", StringComparison.OrdinalIgnoreCase) ||
                     accountType.Equals("Cost of Sales", StringComparison.OrdinalIgnoreCase))
                 {
-                    var amount = debit - credit;
+                    decimal amount = debit - credit;
                     if (amount != 0)
                     {
                         costLines.Add(new ProfitLossRowVm
                         {
                             RowType = "Account",
                             Code = accountCode,
-                            Description = a.AccountName,
+                            Description = account.AccountName,
                             Amount = amount
                         });
                         costOfSalesTotal += amount;
@@ -131,14 +109,14 @@ namespace GLPack.Services
                     accountType.Equals("Expense", StringComparison.OrdinalIgnoreCase) ||
                     accountType.Equals("Expenses", StringComparison.OrdinalIgnoreCase))
                 {
-                    var amount = debit - credit;
+                    decimal amount = debit - credit;
                     if (amount != 0)
                     {
                         expenseLines.Add(new ProfitLossRowVm
                         {
                             RowType = "Account",
                             Code = accountCode,
-                            Description = a.AccountName,
+                            Description = account.AccountName,
                             Amount = amount
                         });
                         expensesTotal += amount;
@@ -146,14 +124,14 @@ namespace GLPack.Services
                 }
                 else if (accountType.Equals("Profit & Loss", StringComparison.OrdinalIgnoreCase))
                 {
-                    var amount = credit - debit;
+                    decimal amount = credit - debit;
                     if (amount != 0)
                     {
                         plLines.Add(new ProfitLossRowVm
                         {
                             RowType = "Account",
                             Code = accountCode,
-                            Description = a.AccountName,
+                            Description = account.AccountName,
                             Amount = amount
                         });
                         balanceBroughtDown += amount;
@@ -161,26 +139,26 @@ namespace GLPack.Services
                 }
             }
 
-            var grossProfit = salesTotal - costOfSalesTotal;
-            var finalProfit = grossProfit - expensesTotal;
-            var carriedForward = finalProfit + balanceBroughtDown;
+            decimal grossProfit = salesTotal - costOfSalesTotal;
+            decimal finalProfit = grossProfit - expensesTotal;
+            decimal carriedForward = finalProfit + balanceBroughtDown;
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Sales" });
             rows.AddRange(salesLines);
             rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Sales", Amount = salesTotal });
-            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Cost of Sales" });
             rows.AddRange(costLines);
             rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Cost of Sales", Amount = costOfSalesTotal });
-            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "Gross Profit", Amount = grossProfit });
-            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Gross Profit", Amount = grossProfit });
+
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Expenses" });
             rows.AddRange(expenseLines);
             rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Total Expenses", Amount = expensesTotal });
-            rows.Add(new ProfitLossRowVm { RowType = "Calculated", Description = "Final Profit", Amount = finalProfit });
-            rows.Add(new ProfitLossRowVm { RowType = "Spacer" });
+            rows.Add(new ProfitLossRowVm { RowType = "Subtotal", Description = "Final Profit", Amount = finalProfit });
+
 
             rows.Add(new ProfitLossRowVm { RowType = "Header", Description = "Balance Brought Down" });
             rows.AddRange(plLines);
@@ -192,38 +170,16 @@ namespace GLPack.Services
 
         public async Task<BalanceSheetVm> GetBalanceSheetAsync(int companyId, CancellationToken ct)
         {
-            var entries = await _db.TransactionEntries
-                .Where(e => e.CompanyId == companyId)
-                .Select(e => new
-                {
-                    e.AccountCode,
-                    AccountName = e.Account.Name,
-                    AccountType = e.Account.Type,
-                    e.Debit,
-                    e.Credit
-                })
-                .ToListAsync(ct);
+            List<AccountReportTotal> grouped = await GetAccountReportTotalsAsync(companyId, ct);
 
-            var grouped = entries
-                .GroupBy(e => new { e.AccountCode, e.AccountName, e.AccountType })
-                .Select(g => new
-                {
-                    g.Key.AccountCode,
-                    g.Key.AccountName,
-                    g.Key.AccountType,
-                    TotalDebit = g.Sum(x => x.Debit),
-                    TotalCredit = g.Sum(x => x.Credit)
-                })
-                .ToList();
+            BalanceSheetVm vm = new BalanceSheetVm();
 
-            var vm = new BalanceSheetVm();
-
-            foreach (var a in grouped)
+            foreach (AccountReportTotal account in grouped)
             {
-                var code = (a.AccountCode ?? "").Trim();
-                var name = (a.AccountName ?? "").Trim();
-                var type = (a.AccountType ?? "").Trim();
-                var amount = GetNetBalance(a.TotalDebit, a.TotalCredit);
+                string code = (account.AccountCode ?? "").Trim();
+                string name = (account.AccountName ?? "").Trim();
+                string type = (account.AccountType ?? "").Trim();
+                decimal amount = GetNetBalance(account.TotalDebit, account.TotalCredit);
 
                 if (amount == 0m)
                     continue;
@@ -344,14 +300,14 @@ namespace GLPack.Services
 
         public async Task<string> GetTrialBalanceCsvAsync(int companyId, CancellationToken ct)
         {
-            var (rows, totalDebit, totalCredit) = await GetTrialBalanceAsync(companyId, ct);
+            (List<TrialBalanceRow> rows, decimal totalDebit, decimal totalCredit) = await GetTrialBalanceAsync(companyId, ct);
 
-            var sb = new StringBuilder();
-            var csv = new CsvWriter(sb);
+            StringBuilder sb = new StringBuilder();
+            CsvWriter csv = new CsvWriter(sb);
 
             csv.WriteRow("Account Code", "Account Name", "Account Type", "Debit", "Credit");
 
-            foreach (var r in rows)
+            foreach (TrialBalanceRow r in rows)
             {
                 csv.WriteRow(
                     r.AccountCode,
@@ -372,14 +328,14 @@ namespace GLPack.Services
 
         public async Task<string> GetProfitAndLossCsvAsync(int companyId, CancellationToken ct)
         {
-            var rows = await GetProfitAndLossAsync(companyId, ct);
+            List<ProfitLossRowVm> rows = await GetProfitAndLossAsync(companyId, ct);
 
-            var sb = new StringBuilder();
-            var csv = new CsvWriter(sb);
+            StringBuilder sb = new StringBuilder();
+            CsvWriter csv = new CsvWriter(sb);
 
             csv.WriteRow("Code", "Description", "Amount", "Total");
 
-            foreach (var row in rows)
+            foreach (ProfitLossRowVm row in rows)
             {
                 if (row.RowType == "Spacer")
                 {
@@ -404,10 +360,10 @@ namespace GLPack.Services
 
         public async Task<string> GetBalanceSheetCsvAsync(int companyId, CancellationToken ct)
         {
-            var bs = await GetBalanceSheetAsync(companyId, ct);
+            BalanceSheetVm bs = await GetBalanceSheetAsync(companyId, ct);
 
-            var sb = new StringBuilder();
-            var csv = new CsvWriter(sb);
+            StringBuilder sb = new StringBuilder();
+            CsvWriter csv = new CsvWriter(sb);
 
             csv.WriteRow("Section", "Code", "Description", "Amount");
 
@@ -418,14 +374,14 @@ namespace GLPack.Services
             csv.WriteRow();
             csv.WriteRow("Represented by", "", "", "");
 
-            foreach (var row in bs.FixedAssetLines)
+            foreach (BalanceSheetLineVm row in bs.FixedAssetLines)
             {
                 csv.WriteRow("Fixed Assets", row.AccountCode, row.AccountName, row.Amount.ToString("0.00", CultureInfo.InvariantCulture));
             }
             csv.WriteRow("Fixed Assets", "", "Net Fixed Assets", bs.NetFixedAssets.ToString("0.00", CultureInfo.InvariantCulture));
 
             csv.WriteRow();
-            foreach (var row in bs.CurrentAssetLines)
+            foreach (BalanceSheetLineVm row in bs.CurrentAssetLines)
             {
                 csv.WriteRow("Current Assets", row.AccountCode, row.AccountName, row.Amount.ToString("0.00", CultureInfo.InvariantCulture));
             }
@@ -433,7 +389,7 @@ namespace GLPack.Services
 
             csv.WriteRow();
 
-            foreach (var row in bs.CurrentLiabilityLines)
+            foreach (BalanceSheetLineVm row in bs.CurrentLiabilityLines)
             {
                 csv.WriteRow("Current Liabilities", row.AccountCode, row.AccountName, row.Amount.ToString("0.00", CultureInfo.InvariantCulture));
             }
@@ -443,6 +399,28 @@ namespace GLPack.Services
             csv.WriteRow("", "", "Total Assets Less Liabilities", bs.TotalAssetsLessLiabilities.ToString("0.00", CultureInfo.InvariantCulture));
 
             return sb.ToString();
+        }
+
+        // ----------------------------
+        // shared report helpers
+        // ----------------------------
+
+        private async Task<List<AccountReportTotal>> GetAccountReportTotalsAsync(int companyId, CancellationToken ct)
+        {
+            List<AccountReportTotal> totals = await _db.TransactionEntries
+                .Where(e => e.CompanyId == companyId)
+                .GroupBy(e => new { e.AccountCode, e.Account.Name, e.Account.Type })
+                .Select(g => new AccountReportTotal
+                {
+                    AccountCode = g.Key.AccountCode,
+                    AccountName = g.Key.Name,
+                    AccountType = g.Key.Type,
+                    TotalDebit = g.Sum(x => x.Debit),
+                    TotalCredit = g.Sum(x => x.Credit)
+                })
+                .ToListAsync(ct);
+
+            return totals;
         }
 
         // ----------------------------
