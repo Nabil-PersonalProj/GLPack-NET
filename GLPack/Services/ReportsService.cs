@@ -192,15 +192,9 @@ namespace GLPack.Services
                         AccountCode = code,
                         AccountName = name,
                         AccountType = type,
-                        Amount = amount
+                        Amount = -amount
                     });
-                    vm.ShareCapitalTotal += amount;
-                    continue;
-                }
-                // profitNLoss account
-                if (type.Equals("Profit & Loss", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "PL"))
-                {
-                    vm.ProfitAndLossTotal += amount;
+                    vm.ShareCapitalTotal += -amount;
                     continue;
                 }
                 // Fixed Assets FA And Accumulated Depreciation PD
@@ -259,24 +253,36 @@ namespace GLPack.Services
                         AccountCode = code,
                         AccountName = name,
                         AccountType = type,
-                        Amount = amount
+                        Amount = -amount
                     });
 
-                    vm.CurrentLiabilitiesTotal += amount;
+                    vm.CurrentLiabilitiesTotal += -amount;
                     continue;
                 }
-                // Get TC accounts
+                // Get TC accounts`
                 if (type.Equals("Creditors", StringComparison.OrdinalIgnoreCase) || type.Equals("Creditor", StringComparison.OrdinalIgnoreCase))
                 {
-                    vm.TotalCreditors += amount;
-                    vm.CurrentLiabilitiesTotal += amount;
+                    vm.TotalCreditors += -amount;
+                    vm.CurrentLiabilitiesTotal += -amount;
+                    continue;
+                }
+                if (type.Equals("Profit & Loss", StringComparison.OrdinalIgnoreCase) && HasPrefix(code, "PL"))
+                {
                     continue;
                 }
             }
+            // profitNLoss account
+            List<ProfitLossRowVm> profitLossRows = await GetProfitAndLossAsync(companyId, ct);
+
+            decimal carriedForward = profitLossRows
+                .Where(x => x.RowType == "Calculated" && x.Description == "P&L Carried Forward")
+                .Sum(x => x.Amount ?? 0m);
+
+            vm.ProfitAndLossTotal = carriedForward;
             // calculated totals
-            vm.EquityTotal = vm.ShareCapitalTotal + vm.ProfitAndLossTotal;
+            vm.EquityTotal = vm.ProfitAndLossTotal + vm.ShareCapitalTotal;
             vm.NetFixedAssets = vm.FixedAssetsFaTotal + vm.FixedAssetsPdTotal;
-            vm.NetCurrentAssets = vm.CurrentAssetsTotal + vm.CurrentLiabilitiesTotal;
+            vm.NetCurrentAssets = vm.CurrentAssetsTotal - vm.CurrentLiabilitiesTotal;
             vm.TotalAssetsLessLiabilities = vm.NetFixedAssets + vm.NetCurrentAssets;
 
             vm.FixedAssetLines = vm.FixedAssetLines
