@@ -237,6 +237,18 @@
 
         if (!companyId || !tbody) return;
 
+        const accountTypes = [
+            "Asset",
+            "Liabilities",
+            "Expense",
+            "Equity",
+            "Profit & Loss",
+            "Sales",
+            "Cost of Sale",
+            "Debtors",
+            "Creditors"
+        ];
+
         let rows = [];
         let prefixRules = [];
         let currentPage = 1;
@@ -381,6 +393,19 @@
             }
         }
 
+        function accountTypeOptions(selectedType) {
+            const cleanSelectedType = (selectedType || "").trim();
+
+            return `
+                <option value="">Select account type</option>
+                ${accountTypes.map(type => `
+                    <option value="${escapeHtml(type)}" ${type === cleanSelectedType ? "selected" : ""}>
+                        ${escapeHtml(type)}
+                    </option>
+                `).join("")}
+            `;
+        }
+
         function rowHtml(row, index) {
             if (row._mode === "edit" || row._mode === "new") {
                 const isNew = row._mode === "new";
@@ -435,10 +460,11 @@
                                 </span>
                               `
                                     : `
-                                <input data-field="type"
-                                       class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
-                                              px-2 py-1 text-xs"
-                                       value="${escapeHtml(row.type || "")}" />
+                                <select data-field="type"
+                                        class="w-full rounded border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900
+                                               px-2 py-1 text-xs">
+                                    ${accountTypeOptions(row.type)}
+                                </select>
                               `
                                 }
                       </td>
@@ -525,7 +551,7 @@
             const code = (row.accountCode || "").trim();
             const prefix = (row.prefix || "").trim().toUpperCase();
             const name = (row.name || "").trim();
-            const type = (row.type || "").trim() || "Unknown";
+            const type = (row.type || "").trim();
             const isActive = row.isActive !== false;
 
             if (row._mode === "new" && !prefix) {
@@ -540,6 +566,11 @@
 
             if (!name) {
                 showAlert(alertHost, "danger", "Account name is required.");
+                return;
+            }
+
+            if (row._mode !== "new" && !type) {
+                showAlert(alertHost, "danger", "Account type is required.");
                 return;
             }
 
@@ -560,6 +591,18 @@
                     const normalized = normalizeAccount(created || dto);
                     rows[index] = Object.assign(normalized, { _mode: "view", _selected: true });
                     showAlert(alertHost, "success", "Account created.");
+                    const linkedPdCreated =
+                        created?.linkedDepreciationAccountCreated ??
+                        created?.LinkedDepreciationAccountCreated ??
+                        false;
+                    const linkedPdCode =
+                        created?.linkedDepreciationAccountCode ??
+                        created?.LinkedDepreciationAccountCode ??
+                        "";
+
+                    if (linkedPdCreated) {
+                        showAlert(alertHost, "success", `Matching depreciation account ${linkedPdCode || "PD"} created.`);
+                    }
                     await load();
                     return;
                 } else {
@@ -1562,6 +1605,18 @@
                 renderDetail(selectedIndex);
 
                 showAlert(alertHost, "success", "Account created.");
+                const linkedPdCreated =
+                    created?.linkedDepreciationAccountCreated ??
+                    created?.LinkedDepreciationAccountCreated ??
+                    false;
+                const linkedPdCode =
+                    created?.linkedDepreciationAccountCode ??
+                    created?.LinkedDepreciationAccountCode ??
+                    "";
+
+                if (linkedPdCreated) {
+                    showAlert(alertHost, "success", `Matching depreciation account ${linkedPdCode || "PD"} created.`);
+                }
             } catch (err) {
                 alert(err.message || "Failed to create account.");
             }

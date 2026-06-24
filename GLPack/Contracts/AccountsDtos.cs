@@ -13,6 +13,8 @@
     {
         public int Id { get; init; }                  // DB surrogate key (if you use one)
         public DateTime CreatedAt { get; init; }
+        public bool LinkedDepreciationAccountCreated { get; init; }
+        public string? LinkedDepreciationAccountCode { get; init; }
     }
 
     public class AccountCreateFromPrefixDto
