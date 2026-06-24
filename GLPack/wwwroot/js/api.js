@@ -124,6 +124,48 @@
         });
     }
 
+    async function importAccounts(companyId, file) {
+        const formData = new FormData();
+        formData.append("importFile", file);
+
+        const res = await fetch(API_BASE + `/api/companies/${companyId}/accounts/import`, {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin",
+            headers: {
+                "Accept": "application/json"
+            }
+        });
+
+        const contentType = res.headers.get("content-type") || "";
+
+        if (!res.ok) {
+            let payload = null;
+            try {
+                payload = contentType.includes("application/json")
+                    ? await res.json()
+                    : await res.text();
+            } catch { /* ignore parse error */ }
+
+            const message =
+                (payload && (
+                    payload.message ||
+                    payload.error ||
+                    payload.detail ||
+                    extractModelStateErrors(payload.errors) ||
+                    payload.title
+                )) ||
+                (typeof payload === "string" ? payload : res.statusText);
+
+            const err = new Error(message || `HTTP ${res.status}`);
+            err.status = res.status;
+            err.payload = payload;
+            throw err;
+        }
+
+        return contentType.includes("application/json") ? res.json() : res.text();
+    }
+
     // ----- Transactions API -----
     function getTransactions(companyId, opts = {}) {
         const {
@@ -286,6 +328,7 @@
         createAccountFromPrefix,
         updateAccount,
         deleteAccount,
+        importAccounts,
         getTransactions,
         createTransaction,
         updateTransaction,

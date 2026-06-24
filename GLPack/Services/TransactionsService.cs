@@ -84,7 +84,7 @@ namespace GLPack.Services
                 LineDescription = e.Memo,
                 Debit = e.Debit,
                 Credit = e.Credit,
-                HasError = IsZeroZeroEntry(e.Debit, e.Credit)
+                HasError = false
             }).ToList();
 
             _db.TransactionEntries.AddRange(lines);
@@ -114,7 +114,7 @@ namespace GLPack.Services
                     Debit = l.Debit,
                     Credit = l.Credit,
                     Memo = l.LineDescription,
-                    HasError = l.HasError || IsZeroZeroEntry(l.Debit, l.Credit)
+                    HasError = l.HasError
                 }).ToList()
             };
         }
@@ -134,7 +134,7 @@ namespace GLPack.Services
                     Debit = l.Debit,
                     Credit = l.Credit,
                     Memo = l.LineDescription,
-                    HasError = l.HasError || IsZeroZeroEntry(l.Debit, l.Credit)
+                    HasError = l.HasError
                 })
                 .ToListAsync(ct);
 
@@ -190,7 +190,7 @@ namespace GLPack.Services
                 .OrderByDescending(t => _db.TransactionEntries.Any(e =>
                     e.CompanyId == t.CompanyId &&
                     e.TransactionNo == t.TransactionNo &&
-                    (e.HasError || (e.Debit == 0m && e.Credit == 0m))))
+                    e.HasError))
                 .ThenByDescending(t => t.Date)
                 .ThenByDescending(t => t.TransactionNo)
                 .Skip((page - 1) * pageSize)
@@ -202,7 +202,7 @@ namespace GLPack.Services
             List<TransactionEntry> lines = await _db.TransactionEntries
                 .AsNoTracking()
                 .Where(i => i.CompanyId == companyId && transactionNos.Contains(i.TransactionNo))
-                .OrderByDescending(i => i.HasError || (i.Debit == 0m && i.Credit == 0m))
+                .OrderByDescending(i => i.HasError)
                 .ThenBy(i => i.TransactionNo)
                 .ThenBy(i => i.Id)
                 .ToListAsync(ct);
@@ -217,7 +217,7 @@ namespace GLPack.Services
                         Debit = x.Debit,
                         Credit = x.Credit,
                         Memo = x.LineDescription,
-                        HasError = x.HasError || IsZeroZeroEntry(x.Debit, x.Credit)
+                        HasError = x.HasError
                     }).ToList()
                 );
 
@@ -311,7 +311,7 @@ namespace GLPack.Services
                 LineDescription = e.Memo,
                 Debit = e.Debit,
                 Credit = e.Credit,
-                HasError = IsZeroZeroEntry(e.Debit, e.Credit)
+                HasError = e.HasError
             }).ToList();
 
             _db.TransactionEntries.AddRange(lines);
@@ -342,7 +342,7 @@ namespace GLPack.Services
                     Debit = l.Debit,
                     Credit = l.Credit,
                     Memo = l.LineDescription,
-                    HasError = l.HasError || IsZeroZeroEntry(l.Debit, l.Credit)
+                    HasError = l.HasError
                 }).ToList()
             };
         }
@@ -381,9 +381,6 @@ namespace GLPack.Services
                 ct: ct
             );
         }
-
-        private static bool IsZeroZeroEntry(decimal debit, decimal credit)
-            => debit == 0m && credit == 0m;
     }
 
 }

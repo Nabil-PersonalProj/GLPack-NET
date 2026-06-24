@@ -81,6 +81,24 @@ namespace GLPack.Controllers
             }
         }
 
+        [HttpPost("import")]
+        public async Task<ActionResult<AccountImportResult>> Import(int companyId, [FromForm] IFormFile importFile, CancellationToken ct)
+        {
+            try
+            {
+                AccountImportResult result = await _svc.ImportAsync(companyId, importFile, ct);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+        }
+
         [HttpGet("prefix-rules")]
         public async Task<ActionResult<IReadOnlyList<AdminPrefixRuleDto>>> GetPrefixRules(int companyId, CancellationToken ct)
         {

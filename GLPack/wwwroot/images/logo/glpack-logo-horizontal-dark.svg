@@ -1,0 +1,30 @@
+<svg width="176" height="48" viewBox="0 0 176 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">GLPack Accounting dark logo</title>
+  <desc id="desc">Transparent dark-mode GLPack Accounting logo with blue GL icon and white wordmark.</desc>
+
+  <defs>
+    <linearGradient id="iconGradient" x1="24" y1="6" x2="24" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F7DFF"/>
+      <stop offset="0.5" stop-color="#1764FF"/>
+      <stop offset="1" stop-color="#0647E8"/>
+    </linearGradient>
+    <linearGradient id="dotGradient" x1="43" y1="34" x2="43" y2="45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34F7B2"/>
+      <stop offset="1" stop-color="#08C989"/>
+    </linearGradient>
+    <filter id="iconShadow" x="-10" y="-6" width="74" height="72" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="7" stdDeviation="6" flood-color="#0B49E6" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#iconShadow)">
+    <rect x="6" y="6" width="36" height="36" rx="10" fill="url(#iconGradient)"/>
+    <text x="24" y="29" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="800" fill="white">GL</text>
+    <circle cx="41" cy="39" r="5.7" fill="#071426" opacity="0.95"/>
+    <circle cx="41" cy="39" r="4.35" fill="url(#dotGradient)"/>
+    <circle cx="41" cy="39" r="1.35" fill="#8FFFE1" opacity="0.9"/>
+  </g>
+
+  <text x="54" y="23" font-family="Inter, Arial, Helvetica, sans-serif" font-size="20" font-weight="800" fill="#FFFFFF" letter-spacing="-1">GLPack</text>
+  <text x="55" y="36" font-family="JetBrains Mono, Consolas, monospace" font-size="7" font-weight="700" fill="#9CC5E9" letter-spacing="2.8">ACCOUNTING</text>
+</svg>

@@ -22,4 +22,15 @@
         public required string Name { get; init; }
         public bool IsActive { get; init; } = true;
     }
+
+    public sealed record SkippedAccountImportLine(
+        int LineNumber,
+        string AccountCode,
+        string Reason,
+        string Text);
+
+    public sealed record AccountImportResult(
+        int ImportedAccounts,
+        int SkippedAccounts,
+        IReadOnlyList<SkippedAccountImportLine> SkippedLines);
 }

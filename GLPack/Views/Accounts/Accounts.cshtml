@@ -30,6 +30,15 @@
                 Delete selected
             </button>
 
+            <button id="btnImportAccounts"
+                    type="button"
+                    class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5
+                           text-xs font-medium text-gray-700 hover:bg-gray-50
+                           dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                <i class="fa-solid fa-file-import mr-2"></i>
+                Import Accounts
+            </button>
+
             <button id="btnAddAccountRow"
                     type="button"
                     class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium
@@ -53,8 +62,8 @@
     </div>
 
     <!-- Alerts -->
-    <div id="accountsAlertHost" 
-         class="fixed top-20 right-10 z-50 w-auto max-w-xs space-y-2 pointer-events-none">
+    <div id="accountsAlertHost"
+         class="fixed bottom-4 left-4 z-[60] w-[calc(100vw-2rem)] max-w-xs space-y-2 pointer-events-none lg:bottom-20 lg:left-5 lg:w-52">
     </div>
 
     <!-- Accounts table -->
@@ -86,6 +95,60 @@
         </div>
     </div>
 </section>
+
+<div id="accountImportModal"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+    <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-neutral-800">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-neutral-100">Import Accounts</h2>
+                <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">Upload CSV or DBF account list.</p>
+            </div>
+            <button id="closeAccountImportModal"
+                    type="button"
+                    class="text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-100">
+                ✕
+            </button>
+        </div>
+
+        <form id="accountImportForm" class="space-y-4 px-5 py-5">
+            <div>
+                <label for="accountImportFile"
+                       class="mb-1 block text-xs font-medium text-gray-600 dark:text-neutral-300">
+                    Account file
+                </label>
+                <input id="accountImportFile"
+                       name="importFile"
+                       type="file"
+                       accept=".csv,.dbf"
+                       class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
+                              file:mr-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5
+                              file:text-xs file:font-medium file:text-indigo-700
+                              dark:border-neutral-700 dark:bg-neutral-950 dark:file:bg-indigo-950 dark:file:text-indigo-200" />
+            </div>
+
+            <div id="accountImportResult"
+                 class="hidden rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs text-gray-700
+                        dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300">
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-neutral-800">
+                <button id="cancelAccountImport"
+                        type="button"
+                        class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700
+                               hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                    Cancel
+                </button>
+                <button id="submitAccountImport"
+                        type="submit"
+                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500
+                               disabled:opacity-50 disabled:cursor-not-allowed">
+                    Import
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 @section Scripts {
     <script>

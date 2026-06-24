@@ -1,0 +1,20 @@
+<svg width="260" height="80" viewBox="0 0 260 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blueGrad" x1="18" y1="16" x2="62" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/><stop offset="0.55" stop-color="#2563EB"/><stop offset="1" stop-color="#1E40AF"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="90" height="90" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#1D4ED8" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g transform="translate(18 16)">
+    <rect width="44" height="44" rx="13" fill="url(#blueGrad)" filter="url(#shadow)"/>
+    <text x="22" y="28" text-anchor="middle" font-family="Plus Jakarta Sans, Inter, Arial, sans-serif" font-size="18" font-weight="800" fill="white" letter-spacing="-0.4">GL</text>
+    <circle cx="40" cy="40" r="7" fill="#10B981" stroke="white" stroke-width="2"/>
+    <path d="M36.8 40.1L39.0 42.3L43.3 37.7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(78 25)">
+    <text x="0" y="20" font-family="Plus Jakarta Sans, Inter, Arial, sans-serif" font-size="25" font-weight="800" fill="#0F172A" letter-spacing="-0.8">GLPack</text>
+    <text x="1" y="37" font-family="JetBrains Mono, Consolas, monospace" font-size="10" font-weight="600" fill="#64748B" letter-spacing="2.6">ACCOUNTING</text>
+  </g>
+</svg>

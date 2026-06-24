@@ -29,6 +29,12 @@
         };
 
         (function () {
+            const defaultThemeVersion = "light-default-v1";
+            if (localStorage.getItem("glpack-theme-default-version") !== defaultThemeVersion) {
+                localStorage.setItem("glpack-theme", "light");
+                localStorage.setItem("glpack-theme-default-version", defaultThemeVersion);
+            }
+
             const savedTheme = localStorage.getItem("glpack-theme") || "light";
             document.documentElement.classList.toggle("dark", savedTheme === "dark");
             document.documentElement.dataset.theme = savedTheme;
@@ -239,29 +245,26 @@
     <header class="sticky top-0 z-40 bg-white/80 dark:bg-neutral-900/80 border-b border-gray-200 dark:border-neutral-800 @(hasCompanyNav ? "lg:pl-60" : "")">
         <div class="@(hasCompanyNav ? "px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between")">
             <div class="flex min-w-0 items-center gap-2">
-                <a href="/"
-                   class="inline-flex items-center gap-2 text-sm rounded-lg border px-3 py-1.5
-                          text-gray-700 dark:text-neutral-100 border-gray-200 dark:border-neutral-700">
-                    <i class="fa-solid fa-house"></i>
-                    <span>Home</span>
-                </a>
-                <span class="text-gray-400">/</span>
                 @if (hasCompanyNav)
                 {
                     <a href="/"
-                       class="text-sm text-gray-600 dark:text-neutral-300 hover:text-gray-900 dark:hover:text-white">
-                        Companies
+                       class="text-sm font-medium text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white">
+                        GLPack
                     </a>
                     <span class="text-gray-400">/</span>
-                    <span class="truncate text-sm font-semibold">@companyName</span>
-                    @if (!string.IsNullOrWhiteSpace(companySection))
-                    {
-                        <span class="hidden text-gray-400 sm:inline">/</span>
-                        <span class="hidden truncate text-sm text-gray-600 dark:text-neutral-300 sm:inline">@companySection</span>
-                    }
+                    <span class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        @companySection
+                    </span>
                 }
                 else
                 {
+                    <a href="/"
+                       class="inline-flex items-center gap-2 text-sm rounded-lg border px-3 py-1.5
+                              text-gray-700 dark:text-neutral-100 border-gray-200 dark:border-neutral-700">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Home</span>
+                    </a>
+                    <span class="text-gray-400">/</span>
                     <span class="font-semibold">@ViewData["Breadcrumb"]</span>
                 }
             </div>
@@ -341,14 +344,37 @@
     @if (hasCompanyNav)
     {
         <div class="lg:pl-60">
-            <aside class="gl-company-sidebar fixed inset-y-0 left-0 z-50 hidden w-60 border-r px-5 py-5 lg:block">
-                <div class="mb-5">
-                    <h2 class="mt-1 truncate text-sm font-semibold text-white">
-                        @companyName
-                    </h2>
+            <aside class="gl-company-sidebar fixed inset-y-0 left-0 z-50 hidden w-60 flex-col border-r px-5 py-5 lg:flex">
+                <div class="mb-7">
+                    <div class="flex items-center gap-3">
+                        <!-- <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-semibold text-white">
+                            GL
+                        </div> -->
+                        <img src="~/images/logo/glpack-logo-horizontal-dark.svg"
+                             alt="GLPack Accounting"
+                             class="h-8 w-auto" />
+                        <!--<div class="min-w-0">
+                            <h2 class="truncate text-sm font-semibold text-white">
+                                GLPack
+                            </h2>
+                        </div>-->
+                    </div>
                 </div>
 
-                <nav class="space-y-1 text-sm" aria-label="Company navigation">
+                <div class="mb-6">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Company
+                    </p>
+                    <h3 class="mt-2 truncate text-sm font-semibold text-white">
+                        @companyName
+                    </h3>
+                </div>
+
+                <div class="mb-6">
+                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Workspace
+                    </p>
+                    <nav class="space-y-1 text-sm" aria-label="Company workspace navigation">
                     <a href="/company/@companyId/dashboard"
                        aria-current="@(IsCompanySection("Dashboard") ? "page" : null)"
                        class="flex items-center justify-between rounded-lg px-3 py-2 @CompanyNavClass("Dashboard")">
@@ -369,9 +395,13 @@
                        class="flex items-center justify-between rounded-lg px-3 py-2 @CompanyNavClass("Reports")">
                         <span>Reports</span>
                     </a>
-                </nav>
+                    </nav>
+                </div>
 
-                <div class="mt-6 border-t border-gray-200 dark:border-neutral-800 pt-4">
+                <div class="border-t border-white/10 pt-4">
+                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Tools
+                    </p>
                     <a href="/company/@companyId/search"
                        aria-current="@(IsCompanySection("Search") ? "page" : null)"
                        class="flex items-center justify-between rounded-lg px-3 py-2 text-sm @CompanyNavClass("Search")">
@@ -379,7 +409,7 @@
                     </a>
                 </div>
 
-                <div class="mt-4 border-t border-white/10 pt-4">
+                <div class="mt-auto border-t border-white/10 pt-4">
                     <a href="/"
                        class="text-xs text-slate-400 hover:text-white">
                         Back to all companies

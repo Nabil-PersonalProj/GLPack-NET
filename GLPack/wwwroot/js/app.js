@@ -103,12 +103,15 @@
 
         function showModalAlert(type, msg) {
             if (!modalAlertHost) return;
+
+            const alertClass = type === "error"
+                ? "rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-900 dark:border-red-700/60 dark:bg-red-950/40 dark:text-red-100"
+                : "rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100";
+
             modalAlertHost.innerHTML = `
-      <div class="${type === 'error'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-emerald-600 dark:text-emerald-400'}">
-        ${escapeHtml(msg)}
-      </div>
+                <div class="${alertClass}">
+                    ${escapeHtml(msg)}
+                </div>
     `;
         }
 
@@ -221,8 +224,16 @@
         const alertHost = document.querySelector('#accountsAlertHost');
         const btnAdd = document.querySelector('#btnAddAccountRow');
         const btnDelete = document.querySelector('#btnDeleteAccounts');
+        const btnImport = document.querySelector('#btnImportAccounts');
         const chkSelectAll = document.querySelector('#chkAccountsSelectAll');
         const pagerHost = document.querySelector('#accountsPager');
+        const importModal = document.querySelector('#accountImportModal');
+        const importForm = document.querySelector('#accountImportForm');
+        const importFile = document.querySelector('#accountImportFile');
+        const importResult = document.querySelector('#accountImportResult');
+        const importSubmit = document.querySelector('#submitAccountImport');
+        const closeImportModal = document.querySelector('#closeAccountImportModal');
+        const cancelImport = document.querySelector('#cancelAccountImport');
 
         if (!companyId || !tbody) return;
 
@@ -285,6 +296,58 @@
                 _selected: false,
                 _orig: null
             };
+        }
+
+        function openImportModal() {
+            if (!importModal) return;
+            importModal.classList.remove("hidden");
+            importModal.classList.add("flex");
+            if (importResult) {
+                importResult.classList.add("hidden");
+                importResult.innerHTML = "";
+            }
+            if (importFile) importFile.value = "";
+        }
+
+        function hideImportModal() {
+            if (!importModal) return;
+            importModal.classList.add("hidden");
+            importModal.classList.remove("flex");
+        }
+
+        function renderImportResult(result) {
+            if (!importResult) return;
+
+            const imported = result.importedAccounts ?? result.ImportedAccounts ?? 0;
+            const skipped = result.skippedAccounts ?? result.SkippedAccounts ?? 0;
+            const skippedLines = result.skippedLines ?? result.SkippedLines ?? [];
+
+            const details = skippedLines.slice(0, 12).map(line => {
+                const lineNumber = line.lineNumber ?? line.LineNumber ?? "";
+                const code = line.accountCode ?? line.AccountCode ?? "";
+                const reason = line.reason ?? line.Reason ?? "";
+
+                return `
+                    <li class="flex gap-2">
+                        <span class="shrink-0 font-mono text-gray-500 dark:text-neutral-500">#${escapeHtml(String(lineNumber))}</span>
+                        <span class="shrink-0 font-mono">${escapeHtml(code || "-")}</span>
+                        <span>${escapeHtml(reason)}</span>
+                    </li>
+                `;
+            }).join("");
+
+            importResult.innerHTML = `
+                <div class="font-medium text-gray-900 dark:text-neutral-100">
+                    Imported ${escapeHtml(String(imported))} account(s). Skipped ${escapeHtml(String(skipped))}.
+                </div>
+                ${details
+                    ? `<ul class="mt-2 max-h-48 space-y-1 overflow-auto">${details}</ul>`
+                    : ""}
+                ${skippedLines.length > 12
+                    ? `<div class="mt-2 text-gray-500 dark:text-neutral-500">Showing first 12 skipped rows.</div>`
+                    : ""}
+            `;
+            importResult.classList.remove("hidden");
         }
 
         function getFilteredRowsWithIndex() {
@@ -594,6 +657,47 @@
             });
         }
 
+        if (btnImport) {
+            btnImport.addEventListener("click", openImportModal);
+        }
+
+        closeImportModal?.addEventListener("click", hideImportModal);
+        cancelImport?.addEventListener("click", hideImportModal);
+
+        importModal?.addEventListener("click", (e) => {
+            if (e.target === importModal) hideImportModal();
+        });
+
+        importForm?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const file = importFile?.files?.[0];
+            if (!file) {
+                showAlert(alertHost, "danger", "Choose a CSV or DBF file to import.");
+                return;
+            }
+
+            try {
+                if (importSubmit) {
+                    importSubmit.disabled = true;
+                    importSubmit.textContent = "Importing...";
+                }
+
+                const result = await API.importAccounts(companyId, file);
+                renderImportResult(result || {});
+                showAlert(alertHost, "success", "Account import finished.");
+                currentPage = 1;
+                await load();
+            } catch (err) {
+                showAlert(alertHost, "danger", "Failed to import accounts: " + err.message);
+            } finally {
+                if (importSubmit) {
+                    importSubmit.disabled = false;
+                    importSubmit.textContent = "Import";
+                }
+            }
+        });
+
         if (searchInput) {
             searchInput?.addEventListener('input', debounce(() => {
                 currentPage = 1;
@@ -875,7 +979,7 @@
                 debit,
                 credit,
                 memo: (e.Memo ?? e.memo ?? "").toString(),
-                hasError: Boolean(e.HasError ?? e.hasError ?? false) || (debit === 0 && credit === 0)
+                hasError: Boolean(e.HasError ?? e.hasError ?? false)
             };
         }
 
@@ -1751,7 +1855,7 @@
             if (!results.length) {
                 tbody.innerHTML = `
                   <tr>
-                    <td class="px-4 py-4 text-sm text-zinc-500" colspan="5">No results.</td>
+                    <td class="px-4 py-4 text-sm text-gray-500 dark:text-neutral-400" colspan="7">No results.</td>
                   </tr>`;
                 if (tfoot) tfoot.innerHTML = "";
                 return;
@@ -1790,18 +1894,18 @@
                 const txHref = `/company/${companyId}/transactions?focusTx=${encodeURIComponent(String(txNo))}`;
 
                 return `
-                    <tr class="border-b border-zinc-800 hover:bg-zinc-900/60">
+                    <tr class="border-b border-gray-100 text-gray-900 hover:bg-gray-50 dark:border-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-800/60">
                         <td class="px-4 py-3 text-xs">
-                            <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                            <a class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-4"
                                href="${txHref}">${escapeHtml(String(txNo))}</a>
                         </td>
                         <td class="px-4 py-3 text-xs">${date}</td>
                         <td class="px-4 py-3 text-xs">
-                            <a class="text-indigo-300 hover:text-indigo-200 underline underline-offset-4"
+                            <a class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-4"
                                href="${accHref}">${accCode}</a>
                         </td>
-                        <td class="px-4 py-3 text-xs text-zinc-300">${description}</td>
-                        <td class="px-4 py-3 text-xs text-zinc-300">${memo}</td>
+                        <td class="px-4 py-3 text-xs text-gray-700 dark:text-neutral-300">${description}</td>
+                        <td class="px-4 py-3 text-xs text-gray-700 dark:text-neutral-300">${memo}</td>
                         <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
                         <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
                     </tr>`;
@@ -1814,7 +1918,7 @@
                     <td class="px-4 py-3 text-left font-mono">${escapeHtml(moneyZero(totalCredit))}</td>
                 </tr>
                 <tr class="font-semibold border-t border-gray-200 dark:border-neutral-800">
-                    <td class="px-4 py-3 text-right" colspan="5">Net Total</td>
+                    <td class="px-4 py-3 text-right" colspan="5">Final Balance</td>
                     <td class="px-4 py-3 text-right font-mono">${escapeHtml(moneyZero(netDebit))}</td>
                     <td class="px-4 py-3 text-left font-mono">${escapeHtml(moneyZero(netCredit))}</td>
                 </tr>`;
@@ -2565,10 +2669,15 @@
         if (!existingMessages.has(msg)) {
             const div = document.createElement("div");
 
-            div.className =
-                type === "success"
-                    ? "pointer-events-auto rounded-lg border border-green-700 bg-green-950 px-3 py-2 text-xs text-green-100 shadow-lg"
-                    : "pointer-events-auto rounded-lg border border-red-700 bg-red-950 px-3 py-2 text-xs text-red-100 shadow-lg";
+            const successClass =
+                "pointer-events-auto rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-lg " +
+                "dark:border-emerald-700/60 dark:bg-emerald-950/80 dark:text-emerald-100";
+
+            const dangerClass =
+                "pointer-events-auto rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-lg " +
+                "dark:border-red-700/60 dark:bg-red-950/80 dark:text-red-100";
+
+            div.className = type === "success" ? successClass : dangerClass;
 
             div.dataset.alertMessage = msg;
             div.textContent = msg;

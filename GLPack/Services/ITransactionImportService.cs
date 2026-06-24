@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-
-namespace GLPack.Services
+﻿namespace GLPack.Services
 {
     public sealed record SkippedImportLine(int LineNumber, string Reason, string Text);
 
@@ -11,6 +9,8 @@ namespace GLPack.Services
 
     public interface ITransactionImportService
     {
+        Task<TransactionImportResult> ImportAsync(int companyId, IFormFile importFile, CancellationToken ct);
         Task<TransactionImportResult> ImportCsvAsync(int companyId, IFormFile csvFile, CancellationToken ct);
+        Task<TransactionImportResult> ImportDbfAsync(int companyId, IFormFile dbfFile, CancellationToken ct);
     }
 }

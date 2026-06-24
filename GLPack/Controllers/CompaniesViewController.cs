@@ -41,7 +41,7 @@ namespace GLPack.Controllers
 
             IQueryable<TransactionEntry> errorQuery = _db.TransactionEntries
                 .AsNoTracking()
-                .Where(e => e.CompanyId == company.Id && (e.HasError || (e.Debit == 0m && e.Credit == 0m)));
+                .Where(e => e.CompanyId == company.Id && e.HasError);
 
             int currentErrorCount = await errorQuery.CountAsync(ct);
 
@@ -59,9 +59,7 @@ namespace GLPack.Controllers
                     Memo = e.LineDescription,
                     Debit = e.Debit,
                     Credit = e.Credit,
-                    Issue = e.Debit == 0m && e.Credit == 0m
-                        ? "Debit and credit are both zero"
-                        : "Entry marked as error"
+                    Issue = "Entry marked as error",
                 })
                 .ToListAsync(ct);
 
@@ -78,7 +76,7 @@ namespace GLPack.Controllers
                     Description = t.Description,
                     TotalDebit = t.Items.Sum(i => i.Debit),
                     TotalCredit = t.Items.Sum(i => i.Credit),
-                    HasErrors = t.Items.Any(i => i.HasError || (i.Debit == 0m && i.Credit == 0m))
+                    HasErrors = t.Items.Any(i => i.HasError)
                 })
                 .ToListAsync(ct);
 
@@ -151,11 +149,11 @@ namespace GLPack.Controllers
 
         [HttpPost("{id:int}/import")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ImportCsv(int id, IFormFile csvFile, CancellationToken ct)
+        public async Task<IActionResult> Import(int id, IFormFile importFile, CancellationToken ct)
         {
             try
             {
-                TransactionImportResult result = await _import.ImportCsvAsync(id, csvFile, ct);
+                TransactionImportResult result = await _import.ImportAsync(id, importFile, ct);
                 int skippedCount = result.SkippedLines.Count;
                 TempData["ImportSuccess"] =
                     $"Imported {result.ImportedLines} lines. Skipped {skippedCount} lines.";
