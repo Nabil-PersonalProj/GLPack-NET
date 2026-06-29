@@ -13,6 +13,7 @@ namespace GLPack.Services
             int companyId,
             string? q,
             string? accountCode,
+            string? accountType,
             int? transactionNo,
             DateTime? from,
             DateTime? to,
@@ -25,6 +26,8 @@ namespace GLPack.Services
 
             q = string.IsNullOrWhiteSpace(q) ? null : q.Trim();
             accountCode = string.IsNullOrWhiteSpace(accountCode) ? null : accountCode.Trim();
+            accountType = string.IsNullOrWhiteSpace(accountType) ? null : accountType.Trim();
+            SearchModifier? modifier = TryParseSearchModifier(q);
 
             var query =
                 from e in _db.TransactionEntries.AsNoTracking()
@@ -42,13 +45,39 @@ namespace GLPack.Services
             if (accountCode is not null)
                 query = query.Where(x => x.a.Code == accountCode);
 
+            if (accountType is not null)
+                query = query.Where(x => x.a.Type == accountType);
+
             if (from is not null)
                 query = query.Where(x => x.t.Date >= from.Value.Date);
 
             if (to is not null)
                 query = query.Where(x => x.t.Date <= to.Value.Date);
 
-            if (q is not null)
+            if (modifier is not null)
+            {
+                if (modifier.Value.Length == 0)
+                {
+                    query = query.Where(x => false);
+                }
+                else if (modifier.Key.Equals("t", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = int.TryParse(modifier.Value, out int modifierTxNo)
+                        ? query.Where(x => x.t.TransactionNo == modifierTxNo)
+                        : query.Where(x => false);
+                }
+                else if (modifier.Key.Equals("a", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(x => EF.Functions.ILike(x.a.Code, $"{modifier.Value}%"));
+                }
+                else if (modifier.Key.Equals("memo", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(x =>
+                        x.e.LineDescription != null &&
+                        EF.Functions.ILike(x.e.LineDescription, $"%{modifier.Value}%"));
+                }
+            }
+            else if (q is not null)
             {
                 bool qIsInt = int.TryParse(q, out int qInt);
 
@@ -81,6 +110,7 @@ namespace GLPack.Services
 
                     AccountCode = x.a.Code,
                     AccountName = x.a.Name,
+                    AccountType = x.a.Type,
 
                     LineDescription = x.e.LineDescription,
                     Debit = x.e.Debit,
@@ -90,5 +120,24 @@ namespace GLPack.Services
 
             return rows;
         }
+
+        private static SearchModifier? TryParseSearchModifier(string? q)
+        {
+            if (q is null) return null;
+
+            int separatorIndex = q.IndexOf(':');
+            if (separatorIndex <= 0) return null;
+
+            string key = q[..separatorIndex].Trim();
+            string value = q[(separatorIndex + 1)..].Trim();
+
+            return key.Equals("t", StringComparison.OrdinalIgnoreCase) ||
+                   key.Equals("a", StringComparison.OrdinalIgnoreCase) ||
+                   key.Equals("memo", StringComparison.OrdinalIgnoreCase)
+                ? new SearchModifier(key, value)
+                : null;
+        }
+
+        private sealed record SearchModifier(string Key, string Value);
     }
 }

@@ -22,16 +22,34 @@
                 
                 <div class="mb-3">
                     <label class="mb-1 ml-1 block text-sm font-medium text-gray-700 dark:text-neutral-200" for="ledgerSearchInput">Search</label>
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-col gap-2 md:flex-row md:items-center">
                             <input id="ledgerSearchInput"
                                    type="text"
-                                   placeholder="Search accounts, transaction no, memo, description..."
+                                   placeholder="Search accounts, transaction no, memo... e.g. t:1001, a:CA111, memo:bank"
                                    class="w-full flex-1 rounded-md border border-gray-300 dark:border-neutral-700
                                     bg-white dark:bg-neutral-900 px-3 py-2 text-xs
                                     text-gray-900 dark:text-neutral-100
                                     placeholder:text-gray-400 dark:placeholder:text-neutral-500
                                     focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                    autocomplete="off" />
+
+                            <select id="ledgerAccountTypeFilter"
+                                    class="w-full rounded-md border border-gray-300 dark:border-neutral-700
+                                    bg-white dark:bg-neutral-900 px-3 py-2 text-xs
+                                    text-gray-900 dark:text-neutral-100
+                                    focus:outline-none focus:ring-2 focus:ring-indigo-400 md:w-56">
+                                <option value="">All account types</option>
+                                <option value="Asset">Asset</option>
+                                <option value="Liabilities">Liabilities</option>
+                                <option value="Expense">Expense</option>
+                                <option value="Equity">Equity</option>
+                                <option value="Profit & Loss">Profit & Loss</option>
+                                <option value="Sales">Sales</option>
+                                <option value="Cost of Sale">Cost of Sale</option>
+                                <option value="Debtors">Debtors</option>
+                                <option value="Creditors">Creditors</option>
+                                <option value="Uncategorized">Uncategorized</option>
+                            </select>
 
                             <button id="btnLedgerSearch"
                                     class="shrink-0 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-500">
@@ -60,7 +78,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-neutral-400">Transaction No.</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Date</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Account No.</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Description</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Account Type</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Memo</th>
                                 <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Debit</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-neutral-400">Credit</th>

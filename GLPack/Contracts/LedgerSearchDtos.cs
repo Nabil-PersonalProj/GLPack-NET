@@ -20,6 +20,7 @@
 
             public string AccountCode { get; init; } = "";
             public string AccountName { get; init; } = "";
+            public string AccountType { get; init; } = "";
 
             public string? LineDescription { get; init; }
 

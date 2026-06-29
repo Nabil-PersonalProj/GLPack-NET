@@ -214,6 +214,7 @@
         const {
             q = "",
             accountCode = "",
+            accountType = "",
             transactionNo = null,
             from = null,
             to = null,
@@ -224,7 +225,8 @@
         const params = new URLSearchParams();
         if (q) params.set("q", q);
         if (accountCode) params.set("accountCode", accountCode);
-        if (transactionNo != null) params.set("transactionNo", String(transactionNo));
+        if (accountType) params.set("accountType", accountType);
+        if (transactionNo != null) params.set("transactionNo", String(transactionNo)); 
         if (from) params.set("from", from);
         if (to) params.set("to", to);
         params.set("page", String(page));

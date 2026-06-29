@@ -16,6 +16,7 @@ namespace GLPack.Controllers
             int companyId,
             string? q,
             string? accountCode,
+            string? accountType,
             int? transactionNo,
             DateTime? from = null,
             DateTime? to = null,
@@ -23,7 +24,7 @@ namespace GLPack.Controllers
             int pageSize = 100,
             CancellationToken ct = default)
         {
-            IEnumerable<LedgerRowDto> results = await _svc.SearchAsync(companyId, q, accountCode, transactionNo, from, to, page, pageSize, ct);
+            IEnumerable<LedgerRowDto> results = await _svc.SearchAsync(companyId, q, accountCode, accountType, transactionNo, from, to, page, pageSize, ct);
             return Ok(results);
         }
     }

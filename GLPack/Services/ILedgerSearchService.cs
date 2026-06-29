@@ -8,6 +8,7 @@ namespace GLPack.Services
             int companyId,
             string? q,
             string? accountCode,
+            string? accountType,
             int? transactionNo,
             DateTime? from,
             DateTime? to,

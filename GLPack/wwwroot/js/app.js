@@ -1878,6 +1878,7 @@
         if (!companyId) return;
 
         const input = document.querySelector('#ledgerSearchInput');
+        const accountTypeFilter = document.querySelector('#ledgerAccountTypeFilter');
         const btnSearch = document.querySelector('#btnLedgerSearch');
         const btnClear = document.querySelector('#btnLedgerClear');
         const tbody = document.querySelector('#ledgerResultsBody');
@@ -1886,6 +1887,7 @@
         const url = new URL(window.location.href);
         const q0 = url.searchParams.get("q") || "";
         const accountCode0 = url.searchParams.get("accountCode") || "";
+        const accountType0 = url.searchParams.get("accountType") || "";
         const transactionNo0 = url.searchParams.get("transactionNo");
         const txNoParsed = transactionNo0 != null && transactionNo0 !== ""
             ? Number(transactionNo0)
@@ -1893,14 +1895,16 @@
         const tfoot = document.querySelector('#ledgerTotalsBody');
 
         if (input) input.value = q0;
+        if (accountTypeFilter) accountTypeFilter.value = accountType0;
 
-        async function runSearch({ q, accountCode, transactionNo } = {}) {
+        async function runSearch({ q, accountCode, accountType, transactionNo } = {}) {
             try {
                 if (alertHost) alertHost.innerHTML = "";
 
                 const results = await API.ledgerSearch(companyId, {
                     q: q || "",
                     accountCode: accountCode || "",
+                    accountType: accountType || "",
                     transactionNo: transactionNo ?? null,
                     page: 1,
                     pageSize: 200
@@ -1947,8 +1951,8 @@
                 const accCodeRaw = r.accountCode ?? "";
                 const accCode = escapeHtml(accCodeRaw);
                 const lineRaw = r.lineDescription ?? "";
-                const txDescRaw = r.transactionDescription ?? "";
-                const description = escapeHtml(txDescRaw || "-");
+                const accountTypeRaw = r.accountType ?? "";
+                const accountType = escapeHtml(accountTypeRaw || "-");
                 const memo = escapeHtml(lineRaw || "-");
                 const debit = money(r.debit);
                 const credit = money(r.credit);
@@ -1968,7 +1972,7 @@
                             <a class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-4"
                                href="${accHref}">${accCode}</a>
                         </td>
-                        <td class="px-4 py-3 text-xs text-gray-700 dark:text-neutral-300">${description}</td>
+                        <td class="px-4 py-3 text-xs text-gray-700 dark:text-neutral-300">${accountType}</td>
                         <td class="px-4 py-3 text-xs text-gray-700 dark:text-neutral-300">${memo}</td>
                         <td class="px-4 py-3 text-xs text-right font-mono">${escapeHtml(debit)}</td>
                         <td class="px-4 py-3 text-xs text-left font-mono">${escapeHtml(credit)}</td>
@@ -1992,14 +1996,17 @@
         if (btnSearch) {
             btnSearch.addEventListener("click", () => {
                 const q = (input?.value || "").trim();
+                const accountType = (accountTypeFilter?.value || "").trim();
                 // free text search takes over; clear drilldown params
                 const next = new URL(window.location.href);
                 next.searchParams.delete("accountCode");
                 next.searchParams.delete("transactionNo");
                 if (q) next.searchParams.set("q", q);
                 else next.searchParams.delete("q");
+                if (accountType) next.searchParams.set("accountType", accountType);
+                else next.searchParams.delete("accountType");
                 window.history.replaceState({}, "", next.toString());
-                runSearch({ q });
+                runSearch({ q, accountType });
             });
         }
         if (input) {
@@ -2010,9 +2017,25 @@
                 }
             });
         }
+        if (accountTypeFilter) {
+            accountTypeFilter.addEventListener("change", () => {
+                const q = (input?.value || "").trim();
+                const accountType = (accountTypeFilter.value || "").trim();
+                const next = new URL(window.location.href);
+                next.searchParams.delete("accountCode");
+                next.searchParams.delete("transactionNo");
+                if (q) next.searchParams.set("q", q);
+                else next.searchParams.delete("q");
+                if (accountType) next.searchParams.set("accountType", accountType);
+                else next.searchParams.delete("accountType");
+                window.history.replaceState({}, "", next.toString());
+                runSearch({ q, accountType });
+            });
+        }
         if (btnClear) {
             btnClear.addEventListener("click", () => {
                 if (input) input.value = "";
+                if (accountTypeFilter) accountTypeFilter.value = "";
                 const next = new URL(window.location.href);
                 next.search = "";
                 window.history.replaceState({}, "", next.toString());
@@ -2022,11 +2045,11 @@
 
         // Auto-run on load (drilldown works immediately)
         if (txNoParsed != null && !Number.isNaN(txNoParsed)) {
-            runSearch({ transactionNo: txNoParsed });
+            runSearch({ transactionNo: txNoParsed, accountType: accountType0 });
         } else if (accountCode0) {
-            runSearch({ accountCode: accountCode0 });
-        } else if (q0) {
-            runSearch({ q: q0 });
+            runSearch({ accountCode: accountCode0, accountType: accountType0 });
+        } else if (q0 || accountType0) {
+            runSearch({ q: q0, accountType: accountType0 });
         }
     }
 
