@@ -221,6 +221,7 @@
 
         const tbody = document.querySelector('#accountsTableBody');
         const searchInput = document.querySelector('#accountsSearch');
+        const typeFilter = document.querySelector('#accountsTypeFilter');
         const alertHost = document.querySelector('#accountsAlertHost');
         const btnAdd = document.querySelector('#btnAddAccountRow');
         const btnDelete = document.querySelector('#btnDeleteAccounts');
@@ -260,6 +261,7 @@
             try {
                 const result = await API.getAccounts(companyId, {
                     q: (searchInput?.value || "").trim(),
+                    accountType: (typeFilter?.value || "").trim(),
                     page: currentPage,
                     pageSize
                 });
@@ -746,6 +748,13 @@
                 currentPage = 1;
                 load();
             }, 200));
+        }
+
+        if (typeFilter) {
+            typeFilter.addEventListener("change", () => {
+                currentPage = 1;
+                load();
+            });
         }
 
         if (chkSelectAll) {

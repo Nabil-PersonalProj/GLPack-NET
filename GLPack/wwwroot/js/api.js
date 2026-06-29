@@ -95,9 +95,10 @@
 
     // ----- Accounts API -----
     function getAccounts(companyId, opts = {}) {
-        const { q = "", page = 1, pageSize = 10 } = opts;
+        const { q = "", accountType = "", page = 1, pageSize = 10 } = opts;
         const params = new URLSearchParams();
         if (q) params.set("q", q);
+        if (accountType) params.set("accountType", accountType);
         if (page) params.set("page", page);
         if (pageSize) params.set("pageSize", pageSize);
 

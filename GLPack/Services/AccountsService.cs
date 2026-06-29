@@ -50,7 +50,7 @@ namespace GLPack.Services
             };
         }
 
-        public async Task<PagedResult<AccountDto>> ListAsync(int companyId, string? q, int page, int pageSize, CancellationToken ct)
+        public async Task<PagedResult<AccountDto>> ListAsync(int companyId, string? q, string? accountType, int page, int pageSize, CancellationToken ct)
         {
             page = page < 1 ? 1 : page;
             pageSize = pageSize < 1 ? 10 : pageSize;
@@ -60,7 +60,15 @@ namespace GLPack.Services
             if (!string.IsNullOrWhiteSpace(q))
             {
                 q = q.Trim();
-                query = query.Where(a => a.Code.Contains(q) || a.Name.Contains(q));
+                query = query.Where(a =>
+                    EF.Functions.ILike(a.Code, $"%{q}%") ||
+                    EF.Functions.ILike(a.Name, $"%{q}%"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(accountType))
+            {
+                accountType = accountType.Trim();
+                query = query.Where(a => a.Type == accountType);
             }
 
             int totalCount = await query.CountAsync(ct);

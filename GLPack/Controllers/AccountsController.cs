@@ -21,9 +21,9 @@ namespace GLPack.Controllers
 
         [HttpGet]
         public async Task<ActionResult<PagedResult<AccountDto>>> List(
-            int companyId, string? q, int page = 1, int pageSize = 10, CancellationToken ct = default)
+            int companyId, string? q, string? accountType, int page = 1, int pageSize = 10, CancellationToken ct = default)
         {
-            PagedResult<AccountDto> result = await _svc.ListAsync(companyId, q, page, pageSize, ct);
+            PagedResult<AccountDto> result = await _svc.ListAsync(companyId, q, accountType, page, pageSize, ct);
             return Ok(result);
         }
 
