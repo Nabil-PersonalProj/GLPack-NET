@@ -17,13 +17,18 @@ builder.Services.AddControllersWithViews(options =>
 });
 
 // EF Core + services
+string? defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(defaultConnection));
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+    options.UseNpgsql(defaultConnection),
+    ServiceLifetime.Scoped);
 
 builder.Services.AddScoped<ITransactionsService, TransactionsService>();
 builder.Services.AddScoped<IAccountsService, AccountsService>();
 builder.Services.AddScoped<ICompaniesService, CompaniesService>();
 builder.Services.AddScoped<IAppLogger, AppLogger>();
+builder.Services.AddScoped<ISqlScriptService, SqlScriptService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<ILedgerSearchService, LedgerSearchService>();
 builder.Services.AddScoped<ITransactionImportService, TransactionImportService>();
@@ -51,6 +56,12 @@ builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    ISqlScriptService sqlScriptService = scope.ServiceProvider.GetRequiredService<ISqlScriptService>();
+    await sqlScriptService.ApplyPendingScriptsAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -63,6 +74,30 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthentication();
+
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        IAppLogger logger = context.RequestServices.GetRequiredService<IAppLogger>();
+
+        await logger.LogAsync(
+            eventType: "ERROR",
+            level: "ERROR",
+            logCode: "UNHANDLED_EXCEPTION",
+            logMessage: $"Unhandled exception on {context.Request.Method} {context.Request.Path}: {ex.Message}",
+            sourceFile: nameof(Program),
+            sourceFunction: "RequestPipeline",
+            ct: context.RequestAborted);
+
+        throw;
+    }
+});
+
 app.UseAuthorization();
 
 app.MapStaticAssets();

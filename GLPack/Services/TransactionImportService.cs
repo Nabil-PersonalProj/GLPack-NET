@@ -60,12 +60,24 @@ namespace GLPack.Services
 
             string extension = Path.GetExtension(importFile.FileName).ToLowerInvariant();
 
-            return extension switch
+            if (extension == ".csv")
             {
-                ".csv" => await ImportCsvAsync(companyId, importFile, ct),
-                ".dbf" => await ImportDbfAsync(companyId, importFile, ct),
-                _ => throw new ArgumentException("Unsupported import file. Please upload a CSV or DBF file.")
-            };
+                return await ImportCsvAsync(companyId, importFile, ct);
+            }
+
+            if (extension == ".dbf")
+            {
+                return await ImportDbfAsync(companyId, importFile, ct);
+            }
+
+            await LogRejectedAsync(
+                "IMPORT_ERROR",
+                "Unsupported import file. Please upload a CSV or DBF file.",
+                companyId,
+                nameof(ImportAsync),
+                ct);
+
+            throw new ArgumentException("Unsupported import file. Please upload a CSV or DBF file.");
         }
 
         public async Task<TransactionImportResult> ImportCsvAsync(int companyId, IFormFile csvFile, CancellationToken ct)
@@ -85,7 +97,24 @@ namespace GLPack.Services
                 throw new ArgumentException("No CSV file uploaded.");
             }
 
-            ParsedImportRows parsed = await ReadCsvRowsAsync(csvFile, ct);
+            ParsedImportRows parsed;
+
+            try
+            {
+                parsed = await ReadCsvRowsAsync(csvFile, ct);
+            }
+            catch (ArgumentException ex)
+            {
+                await LogRejectedAsync(
+                    "CSV_IMPORT_ERROR",
+                    ex.Message,
+                    companyId,
+                    nameof(ImportCsvAsync),
+                    ct);
+
+                throw;
+            }
+
             return await SaveImportedRowsAsync(
                 companyId,
                 parsed,
@@ -111,7 +140,24 @@ namespace GLPack.Services
                 throw new ArgumentException("No DBF file uploaded.");
             }
 
-            ParsedImportRows parsed = await ReadDbfRowsAsync(dbfFile, ct);
+            ParsedImportRows parsed;
+
+            try
+            {
+                parsed = await ReadDbfRowsAsync(dbfFile, ct);
+            }
+            catch (ArgumentException ex)
+            {
+                await LogRejectedAsync(
+                    "DBF_IMPORT_ERROR",
+                    ex.Message,
+                    companyId,
+                    nameof(ImportDbfAsync),
+                    ct);
+
+                throw;
+            }
+
             return await SaveImportedRowsAsync(
                 companyId,
                 parsed,
@@ -135,7 +181,16 @@ namespace GLPack.Services
             // Ensure company exists
             bool companyExists = await _db.Companies.AnyAsync(c => c.Id == companyId, ct);
             if (!companyExists)
+            {
+                await LogRejectedAsync(
+                    $"{importType}_IMPORT_ERROR",
+                    "Company not found.",
+                    companyId,
+                    sourceFunction,
+                    ct);
+
                 throw new KeyNotFoundException("Company not found.");
+            }
 
             // Group key = Date + SourceTrxNo
             // Use yyyy-MM-dd to avoid string-format differences.
@@ -680,6 +735,24 @@ namespace GLPack.Services
                 .FirstOrDefault(x => code.StartsWith(x.Prefix.ToUpperInvariant()));
 
             return match?.AccountType ?? "Uncategorized";
+        }
+
+        private async Task LogRejectedAsync(
+            string logCode,
+            string message,
+            int companyId,
+            string sourceFunction,
+            CancellationToken ct)
+        {
+            await _logger.LogAsync(
+                eventType: "ERROR",
+                level: "WARN",
+                logCode: logCode,
+                logMessage: message,
+                companyId: companyId,
+                sourceFile: nameof(TransactionImportService),
+                sourceFunction: sourceFunction,
+                ct: ct);
         }
     }
 }

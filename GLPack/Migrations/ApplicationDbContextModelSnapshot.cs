@@ -110,6 +110,13 @@ namespace GLPack.Migrations
                     b.Property<DateTime>("TsUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.ToTable("AppLogs");

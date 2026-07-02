@@ -43,6 +43,17 @@ namespace GLPack.Controllers
 
             if (user == null || string.IsNullOrEmpty(user.PasswordHash))
             {
+                await _logger.LogAsync(
+                    eventType: "AUTH",
+                    level: "WARN",
+                    logCode: "LOGIN_FAILED",
+                    logMessage: $"Failed login for {model.Email}. User was not found or inactive.",
+                    companyId: null,
+                    userEmail: model.Email,
+                    sourceFile: nameof(UserAccountController),
+                    sourceFunction: nameof(Login),
+                    ct: ct);
+
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
                 return View(model);
             }
@@ -50,6 +61,18 @@ namespace GLPack.Controllers
             PasswordVerificationResult result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, model.Password);
             if (result == PasswordVerificationResult.Failed)
             {
+                await _logger.LogAsync(
+                    eventType: "AUTH",
+                    level: "WARN",
+                    logCode: "LOGIN_FAILED",
+                    logMessage: $"Failed login for {user.Email}. Password verification failed.",
+                    companyId: null,
+                    userId: user.Id,
+                    userEmail: user.Email,
+                    sourceFile: nameof(UserAccountController),
+                    sourceFunction: nameof(Login),
+                    ct: ct);
+
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
                 return View(model);
             }
@@ -77,6 +100,8 @@ namespace GLPack.Controllers
                 logCode: "LOGIN_SUCCESS",
                 logMessage: $"User {user.Email} logged in.",
                 companyId: null,
+                userId: user.Id,
+                userEmail: user.Email,
                 sourceFile: nameof(UserAccountController),
                 sourceFunction: nameof(Login),
                 ct: ct);
@@ -101,6 +126,7 @@ namespace GLPack.Controllers
                 logCode: "LOGOUT",
                 logMessage: $"User {email} logged out.",
                 companyId: null,
+                userEmail: email,
                 sourceFile: nameof(UserAccountController),
                 sourceFunction: nameof(Logout),
                 ct: ct);

@@ -1,4 +1,4 @@
-﻿namespace GLPack.Services
+namespace GLPack.Services
 {
     public interface IAppLogger
     {
@@ -8,9 +8,10 @@
             string logCode,
             string logMessage,
             int? companyId = null,
+            int? userId = null,
+            string? userEmail = null,
             string? sourceFile = null,
             string? sourceFunction = null,
-            CancellationToken ct = default
-            );
+            CancellationToken ct = default);
     }
 }

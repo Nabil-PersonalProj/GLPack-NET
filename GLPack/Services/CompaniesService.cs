@@ -53,7 +53,20 @@ namespace GLPack.Services
         public async Task UpdateAsync(int id, CompanyUpsertDto dto, CancellationToken ct)
         {
             Company? c = await _db.Companies.FirstOrDefaultAsync(x => x.Id == id, ct);
-            if (c is null) throw new KeyNotFoundException("Company not found.");
+            if (c is null)
+            {
+                await _appLogger.LogAsync(
+                    eventType: "ERROR",
+                    level: "WARN",
+                    logCode: "COMPANY_UPDATE_REJECTED",
+                    logMessage: $"Company {id} was not found.",
+                    companyId: id,
+                    sourceFile: nameof(CompaniesService),
+                    sourceFunction: nameof(UpdateAsync),
+                    ct: ct);
+
+                throw new KeyNotFoundException("Company not found.");
+            }
             c.Name = dto.Name;
             await _db.SaveChangesAsync(ct);
             await _appLogger.LogAsync(
@@ -71,7 +84,20 @@ namespace GLPack.Services
         {
             Company? c = await _db.Companies.Include(x => x.Accounts).Include(x => x.Transactions)
                 .FirstOrDefaultAsync(x => x.Id == id, ct);
-            if (c is null) return;
+            if (c is null)
+            {
+                await _appLogger.LogAsync(
+                    eventType: "ERROR",
+                    level: "WARN",
+                    logCode: "COMPANY_DELETE_REJECTED",
+                    logMessage: $"Company {id} was not found.",
+                    companyId: id,
+                    sourceFile: nameof(CompaniesService),
+                    sourceFunction: nameof(DeleteAsync),
+                    ct: ct);
+
+                return;
+            }
 
             if (c.Accounts.Any() || c.Transactions.Any())
             {

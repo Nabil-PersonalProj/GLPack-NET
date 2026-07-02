@@ -16,12 +16,30 @@ namespace GLPack.Services
         {
             // Validate Payload
             if (dto.Entries == null || dto.Entries.Count < 2)
+            {
+                await LogRejectedAsync(
+                    "TX_CREATE_REJECTED",
+                    "A transaction must have at least two entries.",
+                    dto.CompanyId,
+                    nameof(CreateAsync),
+                    ct);
+
                 throw new ArgumentException("A transaction must have at least two entries.");
+            }
 
             foreach (Tx.TransactionEntryDto entry in dto.Entries)
             {
                 if (entry.Debit < 0m || entry.Credit < 0m)
+                {
+                    await LogRejectedAsync(
+                        "TX_CREATE_REJECTED",
+                        "Entry debit and credit must be zero or positive.",
+                        dto.CompanyId,
+                        nameof(CreateAsync),
+                        ct);
+
                     throw new ArgumentException("Entry debit and credit must be zero or positive.");
+                }
             }
 
             decimal totalDr = dto.Entries.Sum(e => e.Debit);
@@ -52,6 +70,13 @@ namespace GLPack.Services
             string[] missing = codes.Except(existingCodes, StringComparer.OrdinalIgnoreCase).ToArray();
             if (missing.Length > 0)
             {
+                await LogRejectedAsync(
+                    "TX_CREATE_REJECTED",
+                    $"Missing account codes: {string.Join(", ", missing)}.",
+                    dto.CompanyId,
+                    nameof(CreateAsync),
+                    ct);
+
                 throw new ArgumentException($"The following account codes do not exist: {string.Join(", ", missing)}");
             }
 
@@ -60,6 +85,13 @@ namespace GLPack.Services
             t.CompanyId == dto.CompanyId && t.TransactionNo == dto.TransactionNo, ct);
             if (exists)
             {
+                await LogRejectedAsync(
+                    "TX_CREATE_REJECTED",
+                    $"TransactionNo {dto.TransactionNo} already exists for this company.",
+                    dto.CompanyId,
+                    nameof(CreateAsync),
+                    ct);
+
                 throw new InvalidOperationException("TransactionNo already exists for this company.");
             }
 
@@ -240,18 +272,55 @@ namespace GLPack.Services
         public async Task<Tx.TransactionDto> UpdateAsync(int companyId, int transactionNo, Tx.TransactionCreateDto dto, CancellationToken ct)
         {
             if (dto.CompanyId != companyId)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    $"Mismatched companyId. Route={companyId}, Payload={dto.CompanyId}.",
+                    companyId,
+                    nameof(UpdateAsync),
+                    ct);
+
                 throw new InvalidOperationException("Mismatched companyId.");
+            }
+
             if (dto.TransactionNo != transactionNo)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    $"Changing TransactionNo is not allowed. Route={transactionNo}, Payload={dto.TransactionNo}.",
+                    companyId,
+                    nameof(UpdateAsync),
+                    ct);
+
                 throw new InvalidOperationException("Changing TransactionNo is not allowed.");
+            }
 
             // 1) Validate payload (same rules as create)
             if (dto.Entries is null || dto.Entries.Count < 2)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    "Transaction must have at least 2 entries.",
+                    companyId,
+                    nameof(UpdateAsync),
+                    ct);
+
                 throw new InvalidOperationException("Transaction must have at least 2 entries.");
+            }
 
             foreach (Tx.TransactionEntryDto e in dto.Entries)
             {
                 if (e.Debit < 0m || e.Credit < 0m)
+                {
+                    await LogRejectedAsync(
+                        "TX_UPDATE_REJECTED",
+                        "All debit and credit amounts must be zero or positive.",
+                        companyId,
+                        nameof(UpdateAsync),
+                        ct);
+
                     throw new InvalidOperationException("All debit and credit amounts must be zero or positive.");
+                }
             }
             decimal totalDr = dto.Entries.Sum(x => x.Debit);
             decimal totalCr = dto.Entries.Sum(x => x.Credit);
@@ -278,12 +347,31 @@ namespace GLPack.Services
                 .ToListAsync(ct);
             string[] missing = codes.Except(existingCodes, StringComparer.OrdinalIgnoreCase).ToArray();
             if (missing.Length > 0)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    $"Missing accounts for CompanyId={dto.CompanyId}: {string.Join(", ", missing)}.",
+                    companyId,
+                    nameof(UpdateAsync),
+                    ct);
+
                 throw new InvalidOperationException($"Missing accounts for CompanyId={dto.CompanyId}: {string.Join(", ", missing)}");
+            }
 
             // 3) Load existing header + lines
             Transaction? header = await _db.Transactions
                 .FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TransactionNo == transactionNo, ct);
-            if (header is null) throw new KeyNotFoundException("Transaction not found.");
+            if (header is null)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    $"Transaction {transactionNo} was not found.",
+                    companyId,
+                    nameof(UpdateAsync),
+                    ct);
+
+                throw new KeyNotFoundException("Transaction not found.");
+            }
 
             // 4) Persist inside a DB transaction: replace header+lines
             await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
@@ -357,7 +445,17 @@ namespace GLPack.Services
             Transaction? header = await _db.Transactions
                 .FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TransactionNo == transactionNo, ct);
 
-            if (header is null) return;
+            if (header is null)
+            {
+                await LogRejectedAsync(
+                    "TX_DELETE_REJECTED",
+                    $"Transaction {transactionNo} was not found.",
+                    companyId,
+                    nameof(DeleteAsync),
+                    ct);
+
+                return;
+            }
 
             await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
 
@@ -380,6 +478,24 @@ namespace GLPack.Services
                 sourceFunction: nameof(DeleteAsync),
                 ct: ct
             );
+        }
+
+        private async Task LogRejectedAsync(
+            string logCode,
+            string message,
+            int companyId,
+            string sourceFunction,
+            CancellationToken ct)
+        {
+            await _appLogger.LogAsync(
+                eventType: "ERROR",
+                level: "WARN",
+                logCode: logCode,
+                logMessage: message,
+                companyId: companyId,
+                sourceFile: nameof(TransactionsService),
+                sourceFunction: sourceFunction,
+                ct: ct);
         }
     }
 

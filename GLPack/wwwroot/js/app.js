@@ -2078,7 +2078,7 @@
             try {
                 tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                    <td colspan="7" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
                         Loading logs...
                     </td>
                 </tr>
@@ -2105,7 +2105,7 @@
 
                 tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="px-4 py-6 text-center text-red-500">
+                    <td colspan="7" class="px-4 py-6 text-center text-red-500">
                         Failed to load logs: ${escapeHtml(err.message || "Unknown error")}
                     </td>
                 </tr>
@@ -2119,7 +2119,7 @@
             if (!items.length) {
                 tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
+                    <td colspan="7" class="px-4 py-6 text-center text-gray-500 dark:text-neutral-400">
                         No logs found.
                     </td>
                 </tr>
@@ -2135,6 +2135,8 @@
                 const logMessage = log.logMessage || log.LogMessage || "";
                 const sourceFile = log.sourceFile || log.SourceFile || "";
                 const sourceFunction = log.sourceFunction || log.SourceFunction || "";
+                const userId = log.userId ?? log.UserId ?? "";
+                const userLabel = userId ? `#${userId}` : "-";
 
                 const source = [sourceFile, sourceFunction]
                     .filter(Boolean)
@@ -2153,6 +2155,9 @@
                     </td>
                     <td class="px-3 py-3 whitespace-nowrap font-mono text-[11px]">
                         ${escapeHtml(logCode)}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap text-gray-600 dark:text-neutral-300">
+                        ${escapeHtml(userLabel)}
                     </td>
                     <td class="px-3 py-3">
                         ${escapeHtml(logMessage)}

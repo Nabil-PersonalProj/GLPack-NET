@@ -54,18 +54,50 @@ namespace GLPack.Controllers
             string email = NormalizeEmail(request.Email);
 
             if (string.IsNullOrWhiteSpace(email))
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_CREATE_REJECTED",
+                    "Email is required.",
+                    nameof(CreateUser),
+                    ct);
+
                 return BadRequest("Email is required.");
+            }
 
             if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_CREATE_REJECTED",
+                    $"Password is required for user {email}.",
+                    nameof(CreateUser),
+                    ct);
+
                 return BadRequest("Password is required.");
+            }
 
             if (request.Password.Length < 6)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_CREATE_REJECTED",
+                    $"Password was too short for user {email}.",
+                    nameof(CreateUser),
+                    ct);
+
                 return BadRequest("Password must be at least 6 characters.");
+            }
 
             bool exists = await _db.AppUsers.AnyAsync(x => x.Email == email, ct);
 
             if (exists)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_CREATE_REJECTED",
+                    $"User '{email}' already exists.",
+                    nameof(CreateUser),
+                    ct);
+
                 return Conflict($"User '{email}' already exists.");
+            }
 
             AppUser user = new AppUser
             {
@@ -134,26 +166,66 @@ namespace GLPack.Controllers
             string email = NormalizeEmail(request.Email);
 
             if (string.IsNullOrWhiteSpace(email))
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_UPDATE_REJECTED",
+                    $"Email is required for user id {id}.",
+                    nameof(UpdateUser),
+                    ct);
+
                 return BadRequest("Email is required.");
+            }
 
             AppUser? user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (user is null)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_UPDATE_REJECTED",
+                    $"User id {id} was not found.",
+                    nameof(UpdateUser),
+                    ct);
+
                 return NotFound("User was not found.");
+            }
 
             bool emailTaken = await _db.AppUsers
                 .AnyAsync(x => x.Id != id && x.Email == email, ct);
 
             if (emailTaken)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_UPDATE_REJECTED",
+                    $"Email '{email}' is already used by another user.",
+                    nameof(UpdateUser),
+                    ct);
+
                 return Conflict($"Email '{email}' is already used by another user.");
+            }
 
             if (currentUserId == id)
             {
                 if (!request.IsAdmin)
+                {
+                    await LogAdminUserRejectedAsync(
+                        "ADMIN_USER_UPDATE_REJECTED",
+                        "Current admin attempted to remove admin access from their own account.",
+                        nameof(UpdateUser),
+                        ct);
+
                     return BadRequest("You cannot remove admin access from your own account.");
+                }
 
                 if (!request.IsActive)
+                {
+                    await LogAdminUserRejectedAsync(
+                        "ADMIN_USER_UPDATE_REJECTED",
+                        "Current admin attempted to deactivate their own account.",
+                        nameof(UpdateUser),
+                        ct);
+
                     return BadRequest("You cannot deactivate your own account.");
+                }
             }
 
             user.Email = email;
@@ -213,15 +285,39 @@ namespace GLPack.Controllers
             CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_RESET_PASSWORD_REJECTED",
+                    $"Password is required for user id {id}.",
+                    nameof(ResetUserPassword),
+                    ct);
+
                 return BadRequest("Password is required.");
+            }
 
             if (request.Password.Length < 6)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_RESET_PASSWORD_REJECTED",
+                    $"Password was too short for user id {id}.",
+                    nameof(ResetUserPassword),
+                    ct);
+
                 return BadRequest("Password must be at least 6 characters.");
+            }
 
             AppUser? user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (user is null)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_RESET_PASSWORD_REJECTED",
+                    $"User id {id} was not found.",
+                    nameof(ResetUserPassword),
+                    ct);
+
                 return NotFound("User was not found.");
+            }
 
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
@@ -279,12 +375,28 @@ namespace GLPack.Controllers
             int? currentUserId = GetCurrentUserId();
 
             if (currentUserId == id)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_DELETE_REJECTED",
+                    "Current admin attempted to delete their own account.",
+                    nameof(DeleteUser),
+                    ct);
+
                 return BadRequest("You cannot delete your own account.");
+            }
 
             AppUser? user = await _db.AppUsers.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (user is null)
+            {
+                await LogAdminUserRejectedAsync(
+                    "ADMIN_USER_DELETE_REJECTED",
+                    $"User id {id} was not found.",
+                    nameof(DeleteUser),
+                    ct);
+
                 return NotFound("User was not found.");
+            }
 
             try
             {
@@ -359,6 +471,23 @@ namespace GLPack.Controllers
                 CreatedAtUtc = user.CreatedAtUtc,
                 LastLoginAtUtc = user.LastLoginAtUtc
             };
+        }
+
+        private async Task LogAdminUserRejectedAsync(
+            string logCode,
+            string message,
+            string sourceFunction,
+            CancellationToken ct)
+        {
+            await _logger.LogAsync(
+                eventType: "ERROR",
+                level: "WARN",
+                logCode: logCode,
+                logMessage: message,
+                companyId: null,
+                sourceFile: nameof(AdminUserController),
+                sourceFunction: sourceFunction,
+                ct: ct);
         }
     }
 }

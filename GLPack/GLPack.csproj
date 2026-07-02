@@ -19,4 +19,8 @@
     <Folder Include="wwwroot\images\logo\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Sql\**\*.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

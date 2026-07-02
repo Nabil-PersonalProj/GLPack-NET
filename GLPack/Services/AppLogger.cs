@@ -1,6 +1,7 @@
-﻿using GLPack.DAL;
+using GLPack.DAL;
 using GLPack.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace GLPack.Services
 {
@@ -9,38 +10,33 @@ namespace GLPack.Services
         private static readonly SemaphoreSlim RetentionCleanupLock = new SemaphoreSlim(1, 1);
         private static DateTime? lastRetentionCleanupUtc;
 
-        private readonly ApplicationDbContext _db;
+        private readonly IDbContextFactory<ApplicationDbContext> _dbContextFactory;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AppLogger(ApplicationDbContext db) => _db = db;
+        public AppLogger(IDbContextFactory<ApplicationDbContext> dbContextFactory, IHttpContextAccessor httpContextAccessor)
+        {
+            _dbContextFactory = dbContextFactory;
+            _httpContextAccessor = httpContextAccessor;
+        }
 
         public async Task LogAsync(
-        string eventType,
-        string level,
-        string logCode,
-        string logMessage,
-        int? companyId = null,
-        string? sourceFile = null,
-        string? sourceFunction = null,
-        CancellationToken ct = default)
+            string eventType,
+            string level,
+            string logCode,
+            string logMessage,
+            int? companyId = null,
+            int? userId = null,
+            string? userEmail = null,
+            string? sourceFile = null,
+            string? sourceFunction = null,
+            CancellationToken ct = default)
         {
-            // Always write UTC for timestamptz
-
-            /* example usage:
-             * await _appLogger.LogAsync(
-                eventType: "AUDIT",
-                level: "INFO",
-                logCode: "TX_CREATE_OK",
-                logMessage: $"Created transaction {dto.TransactionNo}",
-                companyId: dto.CompanyId,
-                sourceFile: nameof(TransactionsService),
-                sourceFunction: nameof(CreateAsync),
-                ct: ct
-                );
-             * */
             AppLog row = new AppLog
             {
                 TsUtc = DateTime.UtcNow,
                 CompanyId = companyId,
+                UserId = userId ?? GetCurrentUserId(),
+                UserEmail = userEmail ?? GetCurrentUserEmail(),
                 SourceFile = sourceFile ?? "",
                 SourceFunction = sourceFunction ?? "",
                 EventType = eventType,
@@ -51,14 +47,26 @@ namespace GLPack.Services
 
             try
             {
+                await using ApplicationDbContext db = await _dbContextFactory.CreateDbContextAsync(ct);
                 await DeleteExpiredLogsIfDueAsync(row.TsUtc, ct);
-                _db.AppLogs.Add(row);
-                await _db.SaveChangesAsync(ct);
+                db.AppLogs.Add(row);
+                await db.SaveChangesAsync(ct);
             }
             catch
             {
-                // continue
+                // Logging should never block the user action that triggered it.
             }
+        }
+
+        private int? GetCurrentUserId()
+        {
+            string? raw = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return int.TryParse(raw, out int id) ? id : null;
+        }
+
+        private string GetCurrentUserEmail()
+        {
+            return _httpContextAccessor.HttpContext?.User.Identity?.Name ?? "";
         }
 
         private async Task DeleteExpiredLogsIfDueAsync(DateTime nowUtc, CancellationToken ct)
@@ -84,7 +92,9 @@ namespace GLPack.Services
 
                 DateTime retentionCutoffUtc = nowUtc.AddMonths(-1);
 
-                await _db.AppLogs
+                await using ApplicationDbContext db = await _dbContextFactory.CreateDbContextAsync(ct);
+
+                await db.AppLogs
                     .Where(log => log.TsUtc < retentionCutoffUtc)
                     .ExecuteDeleteAsync(ct);
 
@@ -95,6 +105,5 @@ namespace GLPack.Services
                 RetentionCleanupLock.Release();
             }
         }
-
     }
 }

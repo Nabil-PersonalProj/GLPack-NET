@@ -12,11 +12,13 @@ namespace GLPack.Controllers
     {
         private readonly IAccountsService _svc;
         private readonly ApplicationDbContext _db;
+        private readonly IAppLogger _logger;
 
-        public AccountsController(IAccountsService svc, ApplicationDbContext db)
+        public AccountsController(IAccountsService svc, ApplicationDbContext db, IAppLogger logger)
         {
             _svc = svc;
             _db = db;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -37,9 +39,29 @@ namespace GLPack.Controllers
         [HttpPut("{accountCode}")]
         public async Task<IActionResult> Update(int companyId, string accountCode, [FromBody] AccountUpsertDto dto, CancellationToken ct)
         {
-            if (dto.CompanyId != companyId) return BadRequest("Mismatched companyId.");
+            if (dto.CompanyId != companyId)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_UPDATE_REJECTED",
+                    $"Mismatched companyId. Route={companyId}, Payload={dto.CompanyId}.",
+                    companyId,
+                    nameof(Update),
+                    ct);
+
+                return BadRequest("Mismatched companyId.");
+            }
+
             if (!string.Equals(dto.AccountCode, accountCode, StringComparison.Ordinal))
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_UPDATE_REJECTED",
+                    $"Changing AccountCode is not allowed. Route='{accountCode}', Payload='{dto.AccountCode}'.",
+                    companyId,
+                    nameof(Update),
+                    ct);
+
                 return BadRequest("Changing AccountCode is not allowed.");
+            }
 
             try
             {
@@ -64,7 +86,16 @@ namespace GLPack.Controllers
             CancellationToken ct)
         {
             if (dto.CompanyId != companyId)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_CREATE_FROM_PREFIX_REJECTED",
+                    $"Mismatched companyId. Route={companyId}, Payload={dto.CompanyId}.",
+                    companyId,
+                    nameof(CreateFromPrefix),
+                    ct);
+
                 return BadRequest("Mismatched companyId.");
+            }
 
             try
             {
@@ -113,6 +144,24 @@ namespace GLPack.Controllers
                 .ToListAsync(ct);
 
             return Ok(rules);
+        }
+
+        private async Task LogRejectedAsync(
+            string logCode,
+            string message,
+            int companyId,
+            string sourceFunction,
+            CancellationToken ct)
+        {
+            await _logger.LogAsync(
+                eventType: "ERROR",
+                level: "WARN",
+                logCode: logCode,
+                logMessage: message,
+                companyId: companyId,
+                sourceFile: nameof(AccountsController),
+                sourceFunction: sourceFunction,
+                ct: ct);
         }
     }
 }

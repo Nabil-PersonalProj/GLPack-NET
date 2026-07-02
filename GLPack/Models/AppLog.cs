@@ -6,6 +6,8 @@
         public DateTime TsUtc { get; set; }
 
         public int? CompanyId { get; set; }
+        public int? UserId { get; set; }
+        public string UserEmail { get; set; } = "";
 
         public string SourceFile { get; set; } = "";
         public string SourceFunction { get; set; } = "";

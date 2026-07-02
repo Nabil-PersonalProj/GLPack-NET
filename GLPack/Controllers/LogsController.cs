@@ -58,6 +58,8 @@ namespace GLPack.Controllers
                     x.LogMessage.ToLower().Contains(search) ||
                     x.SourceFile.ToLower().Contains(search) ||
                     x.SourceFunction.ToLower().Contains(search) ||
+                    x.UserEmail.ToLower().Contains(search) ||
+                    (x.UserId.HasValue && x.UserId.Value.ToString().Contains(search)) ||
                     x.EventType.ToLower().Contains(search) ||
                     x.Level.ToLower().Contains(search));
             }
@@ -74,6 +76,8 @@ namespace GLPack.Controllers
                     Id = x.Id,
                     TsUtc = x.TsUtc,
                     CompanyId = x.CompanyId,
+                    UserId = x.UserId,
+                    UserEmail = x.UserEmail,
                     SourceFile = x.SourceFile,
                     SourceFunction = x.SourceFunction,
                     EventType = x.EventType,

@@ -99,7 +99,17 @@ namespace GLPack.Services
         public async Task UpdateAsync(int companyId, string accountCode, AccountUpsertDto dto, CancellationToken ct)
         {
             Account? a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
-            if (a is null) throw new KeyNotFoundException("Account not found.");
+            if (a is null)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_UPDATE_REJECTED",
+                    $"Account {accountCode} was not found.",
+                    companyId,
+                    nameof(UpdateAsync),
+                    ct);
+
+                throw new KeyNotFoundException("Account not found.");
+            }
 
             // We do NOT let callers change the business key (Code) via update path.
             a.Name = dto.Name;
@@ -120,7 +130,17 @@ namespace GLPack.Services
         public async Task DeleteAsync(int companyId, string accountCode, CancellationToken ct)
         {
             Account? a = await _db.Accounts.FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Code == accountCode, ct);
-            if (a is null) return;
+            if (a is null)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_DELETE_REJECTED",
+                    $"Account {accountCode} was not found.",
+                    companyId,
+                    nameof(DeleteAsync),
+                    ct);
+
+                return;
+            }
             _db.Accounts.Remove(a);
             await _db.SaveChangesAsync(ct);
             await _appLogger.LogAsync(
@@ -140,17 +160,44 @@ namespace GLPack.Services
             string name = (dto.Name ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(prefix))
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_CREATE_FROM_PREFIX_REJECTED",
+                    "Prefix is required.",
+                    dto.CompanyId,
+                    nameof(CreateFromPrefixAsync),
+                    ct);
+
                 throw new InvalidOperationException("Prefix is required.");
+            }
 
             if (string.IsNullOrWhiteSpace(name))
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_CREATE_FROM_PREFIX_REJECTED",
+                    "Account name is required.",
+                    dto.CompanyId,
+                    nameof(CreateFromPrefixAsync),
+                    ct);
+
                 throw new InvalidOperationException("Account name is required.");
+            }
 
             AccountTypePrefix? prefixRule = await _db.AccountTypePrefixes
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Prefix == prefix, ct);
 
             if (prefixRule is null)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_CREATE_FROM_PREFIX_REJECTED",
+                    $"Prefix rule '{prefix}' was not found.",
+                    dto.CompanyId,
+                    nameof(CreateFromPrefixAsync),
+                    ct);
+
                 throw new InvalidOperationException($"Prefix rule '{prefix}' was not found.");
+            }
 
             string nextCode = await GenerateNextAccountCodeAsync(dto.CompanyId, prefix, ct);
 
@@ -184,7 +231,16 @@ namespace GLPack.Services
                         .FirstOrDefaultAsync(x => x.Prefix == "PD", ct);
 
                     if (pdPrefixRule is null)
+                    {
+                        await LogRejectedAsync(
+                            "ACCOUNTS_CREATE_FROM_PREFIX_REJECTED",
+                            "PD prefix rule was not found.",
+                            dto.CompanyId,
+                            nameof(CreateFromPrefixAsync),
+                            ct);
+
                         throw new InvalidOperationException("PD prefix rule was not found.");
+                    }
 
                     Account entityPD = new Account
                     {
@@ -226,23 +282,57 @@ namespace GLPack.Services
         public async Task<AccountImportResult> ImportAsync(int companyId, IFormFile importFile, CancellationToken ct)
         {
             if (importFile == null || importFile.Length == 0)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_IMPORT_REJECTED",
+                    "No file uploaded.",
+                    companyId,
+                    nameof(ImportAsync),
+                    ct);
+
                 throw new ArgumentException("No file uploaded.");
+            }
 
             string extension = Path.GetExtension(importFile.FileName).ToLowerInvariant();
 
-            ParsedAccountImportRows parsed = extension switch
+            ParsedAccountImportRows parsed;
+
+            try
             {
-                ".csv" => await ReadCsvRowsAsync(importFile, ct),
-                ".dbf" => await ReadDbfRowsAsync(importFile, ct),
-                _ => throw new ArgumentException("Unsupported account import file. Please upload a CSV or DBF file.")
-            };
+                parsed = extension switch
+                {
+                    ".csv" => await ReadCsvRowsAsync(importFile, ct),
+                    ".dbf" => await ReadDbfRowsAsync(importFile, ct),
+                    _ => throw new ArgumentException("Unsupported account import file. Please upload a CSV or DBF file.")
+                };
+            }
+            catch (ArgumentException ex)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_IMPORT_REJECTED",
+                    ex.Message,
+                    companyId,
+                    nameof(ImportAsync),
+                    ct);
+
+                throw;
+            }
 
             if (parsed.Rows.Count == 0)
                 return new AccountImportResult(0, parsed.SkippedLines.Count, parsed.SkippedLines);
 
             bool companyExists = await _db.Companies.AnyAsync(c => c.Id == companyId, ct);
             if (!companyExists)
+            {
+                await LogRejectedAsync(
+                    "ACCOUNTS_IMPORT_REJECTED",
+                    "Company not found.",
+                    companyId,
+                    nameof(ImportAsync),
+                    ct);
+
                 throw new KeyNotFoundException("Company not found.");
+            }
 
             List<AccountTypePrefix> prefixRules = await _db.AccountTypePrefixes
                 .AsNoTracking()
@@ -667,6 +757,24 @@ namespace GLPack.Services
 
             int nextNumber = maxNumber + 1;
             return $"{prefix}{nextNumber:000}";
+        }
+
+        private async Task LogRejectedAsync(
+            string logCode,
+            string message,
+            int companyId,
+            string sourceFunction,
+            CancellationToken ct)
+        {
+            await _appLogger.LogAsync(
+                eventType: "ERROR",
+                level: "WARN",
+                logCode: logCode,
+                logMessage: message,
+                companyId: companyId,
+                sourceFile: nameof(AccountsService),
+                sourceFunction: sourceFunction,
+                ct: ct);
         }
     }
 }

@@ -10,7 +10,13 @@ namespace GLPack.Controllers
     public class TransactionsController : ControllerBase
     {
         private readonly ITransactionsService _svc;
-        public TransactionsController(ITransactionsService svc) => _svc = svc;
+        private readonly IAppLogger _logger;
+
+        public TransactionsController(ITransactionsService svc, IAppLogger logger)
+        {
+            _svc = svc;
+            _logger = logger;
+        }
 
         [HttpGet]
         public async Task<ActionResult<PagedResult<Tx.TransactionDto>>> List(
@@ -47,7 +53,17 @@ namespace GLPack.Controllers
             [FromBody] Tx.TransactionCreateDto dto,
             CancellationToken ct)
         {
-            if (dto.CompanyId != companyId) return BadRequest("Mismatched companyId.");
+            if (dto.CompanyId != companyId)
+            {
+                await LogRejectedAsync(
+                    "TX_CREATE_REJECTED",
+                    $"Mismatched companyId. Route={companyId}, Payload={dto.CompanyId}.",
+                    companyId,
+                    nameof(Create),
+                    ct);
+
+                return BadRequest("Mismatched companyId.");
+            }
 
             try
             {
@@ -67,8 +83,29 @@ namespace GLPack.Controllers
             [FromBody] Tx.TransactionCreateDto dto,
             CancellationToken ct)
         {
-            if (dto.CompanyId != companyId) return BadRequest("Mismatched companyId.");
-            if (dto.TransactionNo != transactionNo) return BadRequest("Changing TransactionNo is not allowed.");
+            if (dto.CompanyId != companyId)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    $"Mismatched companyId. Route={companyId}, Payload={dto.CompanyId}.",
+                    companyId,
+                    nameof(Update),
+                    ct);
+
+                return BadRequest("Mismatched companyId.");
+            }
+
+            if (dto.TransactionNo != transactionNo)
+            {
+                await LogRejectedAsync(
+                    "TX_UPDATE_REJECTED",
+                    $"Changing TransactionNo is not allowed. Route={transactionNo}, Payload={dto.TransactionNo}.",
+                    companyId,
+                    nameof(Update),
+                    ct);
+
+                return BadRequest("Changing TransactionNo is not allowed.");
+            }
 
             try
             {
@@ -90,6 +127,24 @@ namespace GLPack.Controllers
         {
             await _svc.DeleteAsync(companyId, transactionNo, ct);
             return NoContent();
+        }
+
+        private async Task LogRejectedAsync(
+            string logCode,
+            string message,
+            int companyId,
+            string sourceFunction,
+            CancellationToken ct)
+        {
+            await _logger.LogAsync(
+                eventType: "ERROR",
+                level: "WARN",
+                logCode: logCode,
+                logMessage: message,
+                companyId: companyId,
+                sourceFile: nameof(TransactionsController),
+                sourceFunction: sourceFunction,
+                ct: ct);
         }
     }
 }
