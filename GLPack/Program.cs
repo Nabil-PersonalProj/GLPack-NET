@@ -32,6 +32,7 @@ builder.Services.AddScoped<ISqlScriptService, SqlScriptService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<ILedgerSearchService, LedgerSearchService>();
 builder.Services.AddScoped<ITransactionImportService, TransactionImportService>();
+builder.Services.AddScoped<ICompanyAccessService, CompanyAccessService>();
 
 // Cookie auth
 builder.Services
@@ -70,6 +71,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStatusCodePagesWithReExecute("/error/{0}");
 
 app.UseRouting();
 

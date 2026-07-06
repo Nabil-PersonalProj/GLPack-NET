@@ -1,6 +1,5 @@
-﻿using GLPack.Models;
+using GLPack.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using System.Reflection;
 
 namespace GLPack.DAL
@@ -18,6 +17,7 @@ namespace GLPack.DAL
         public DbSet<GLPack.Models.AppLog> AppLogs => Set<GLPack.Models.AppLog>();
         public DbSet<AppUser> AppUsers => Set<AppUser>();
         public DbSet<AccountTypePrefix> AccountTypePrefixes => Set<AccountTypePrefix>();
+        public DbSet<CompanyUserAccess> CompanyUserAccesses => Set<CompanyUserAccess>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -1,4 +1,4 @@
-﻿using GLPack.Services;
+using GLPack.Services;
 using Microsoft.AspNetCore.Mvc;
 using static GLPack.Contracts.LedgerSearchDtos;
 
@@ -9,7 +9,13 @@ namespace GLPack.Controllers
     public class LedgerSearchController : ControllerBase
     {
         private readonly ILedgerSearchService _svc;
-        public LedgerSearchController(ILedgerSearchService svc) => _svc = svc;
+        private readonly ICompanyAccessService _companyAccess;
+
+        public LedgerSearchController(ILedgerSearchService svc, ICompanyAccessService companyAccess)
+        {
+            _svc = svc;
+            _companyAccess = companyAccess;
+        }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<LedgerRowDto>>> Search(
@@ -24,6 +30,8 @@ namespace GLPack.Controllers
             int pageSize = 100,
             CancellationToken ct = default)
         {
+            if (!await _companyAccess.CanAccessCompanyAsync(User, companyId, ct)) return NotFound();
+
             IEnumerable<LedgerRowDto> results = await _svc.SearchAsync(companyId, q, accountCode, accountType, transactionNo, from, to, page, pageSize, ct);
             return Ok(results);
         }

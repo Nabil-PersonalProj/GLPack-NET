@@ -1,7 +1,6 @@
-﻿using GLPack.Models;
+using GLPack.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace GLPack.DAL.Config
 {
@@ -15,6 +14,16 @@ namespace GLPack.DAL.Config
             b.Property(x => x.Name)
              .IsRequired()
              .HasMaxLength(255);
+
+            b.Property(x => x.Currency)
+             .IsRequired()
+             .HasMaxLength(3)
+             .HasDefaultValue("SGD");
+
+            b.Property(x => x.FinancialYearEnd)
+             .IsRequired()
+             .HasMaxLength(5)
+             .HasDefaultValue("12-31");
 
             b.HasIndex(x => x.Name).IsUnique();
         }

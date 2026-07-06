@@ -1,4 +1,4 @@
-﻿namespace GLPack.Models
+namespace GLPack.Models
 {
     public class AppUser
     {

@@ -4,6 +4,7 @@
     string? companyName = ViewData["CompanyName"]?.ToString();
     string? companySection = ViewData["CompanySection"]?.ToString();
     bool hasCompanyNav = !string.IsNullOrWhiteSpace(companyId) && !string.IsNullOrWhiteSpace(companyName);
+    bool isAdmin = User.HasClaim("IsAdmin", "True");
     bool IsCompanySection(string section) =>
         string.Equals(companySection, section, StringComparison.OrdinalIgnoreCase);
     string CompanyNavClass(string section) =>
@@ -298,7 +299,7 @@
                                     bg-white dark:bg-neutral-900
                                     shadow-lg overflow-hidden z-50">
                             <!-- if admin user-->
-                            @if (User.HasClaim("IsAdmin", "True"))
+                            @if (isAdmin)
                             {
                                 <a href="/admin"
                                        class="flex items-center gap-2 px-4 py-2 text-sm
@@ -407,6 +408,14 @@
                        class="flex items-center justify-between rounded-lg px-3 py-2 text-sm @CompanyNavClass("Search")">
                         <span>Search</span>
                     </a>
+                    @if (isAdmin)
+                    {
+                        <a href="/company/@companyId/settings"
+                           aria-current="@(IsCompanySection("Settings") ? "page" : null)"
+                           class="mt-1 flex items-center justify-between rounded-lg px-3 py-2 text-sm @CompanyNavClass("Settings")">
+                            <span>Settings</span>
+                        </a>
+                    }
                 </div>
 
                 <div class="mt-auto border-t border-white/10 pt-4">
@@ -444,6 +453,14 @@
                        class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Search")">
                         Search
                     </a>
+                    @if (isAdmin)
+                    {
+                        <a href="/company/@companyId/settings"
+                           aria-current="@(IsCompanySection("Settings") ? "page" : null)"
+                           class="shrink-0 rounded-lg px-3 py-1.5 @MobileCompanyNavClass("Settings")">
+                            Settings
+                        </a>
+                    }
                 </nav>
 
                 <main class="min-w-0 px-4 sm:px-6 lg:px-8 py-6">

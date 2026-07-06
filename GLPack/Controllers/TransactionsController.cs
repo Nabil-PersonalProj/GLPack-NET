@@ -1,4 +1,4 @@
-﻿using GLPack.Contracts;
+using GLPack.Contracts;
 using GLPack.Services;
 using Microsoft.AspNetCore.Mvc;
 using Tx = GLPack.Contracts.TransactionsDtos;
@@ -11,11 +11,16 @@ namespace GLPack.Controllers
     {
         private readonly ITransactionsService _svc;
         private readonly IAppLogger _logger;
+        private readonly ICompanyAccessService _companyAccess;
 
-        public TransactionsController(ITransactionsService svc, IAppLogger logger)
+        public TransactionsController(
+            ITransactionsService svc,
+            IAppLogger logger,
+            ICompanyAccessService companyAccess)
         {
             _svc = svc;
             _logger = logger;
+            _companyAccess = companyAccess;
         }
 
         [HttpGet]
@@ -29,6 +34,8 @@ namespace GLPack.Controllers
             int? transactionNo = null,
             CancellationToken ct = default)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             (var items, int total) = await _svc.ListAsync(companyId, page, pageSize, q, transactionNo, from, to, ct);
 
             return Ok(new PagedResult<Tx.TransactionDto>
@@ -43,6 +50,8 @@ namespace GLPack.Controllers
         [HttpGet("{transactionNo:int}")]
         public async Task<ActionResult<Tx.TransactionDto>> Get(int companyId, int transactionNo, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             Tx.TransactionDto? item = await _svc.GetAsync(companyId, transactionNo, ct);
             return item is null ? NotFound() : Ok(item);
         }
@@ -53,6 +62,8 @@ namespace GLPack.Controllers
             [FromBody] Tx.TransactionCreateDto dto,
             CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             if (dto.CompanyId != companyId)
             {
                 await LogRejectedAsync(
@@ -83,6 +94,8 @@ namespace GLPack.Controllers
             [FromBody] Tx.TransactionCreateDto dto,
             CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             if (dto.CompanyId != companyId)
             {
                 await LogRejectedAsync(
@@ -125,8 +138,15 @@ namespace GLPack.Controllers
         [HttpDelete("{transactionNo:int}")]
         public async Task<IActionResult> Delete(int companyId, int transactionNo, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             await _svc.DeleteAsync(companyId, transactionNo, ct);
             return NoContent();
+        }
+
+        private Task<bool> CanAccessCompanyAsync(int companyId, CancellationToken ct)
+        {
+            return _companyAccess.CanAccessCompanyAsync(User, companyId, ct);
         }
 
         private async Task LogRejectedAsync(

@@ -1,5 +1,6 @@
-﻿using GLPack.Contracts;
+using GLPack.Contracts;
 using GLPack.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GLPack.Controllers
@@ -14,6 +15,7 @@ namespace GLPack.Controllers
         public CompaniesController(ICompaniesService svc) => _svc = svc;
 
         [HttpPost]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<ActionResult<CompanyDto>> Create([FromBody] CompanyUpsertDto dto, CancellationToken ct)
         {
             CompanyDto created = await _svc.CreateAsync(dto, ct);
@@ -32,6 +34,7 @@ namespace GLPack.Controllers
             => Ok(await _svc.ListAsync(q, page, pageSize, ct));
 
         [HttpPut("{id:int}")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> Update(int id, [FromBody] CompanyUpsertDto dto, CancellationToken ct)
         {
             try { await _svc.UpdateAsync(id, dto, ct); return NoContent(); }
@@ -39,6 +42,7 @@ namespace GLPack.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
         {
             try { await _svc.DeleteAsync(id, ct); return NoContent(); }

@@ -1,6 +1,7 @@
 using GLPack.Models;
 using GLPack.Services;
 using GLPack.ViewModels.Home;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 
@@ -26,6 +27,20 @@ namespace GLPack.Controllers
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+
+        [AllowAnonymous]
+        [HttpGet("/error/{statusCode:int}")]
+        public IActionResult StatusCodePage(int statusCode)
+        {
+            if (statusCode == StatusCodes.Status404NotFound)
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return View("~/Views/Shared/NotFound.cshtml");
+            }
+
+            Response.StatusCode = statusCode;
+            return View("Error", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
 
         [HttpGet("/")]

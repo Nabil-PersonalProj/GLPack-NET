@@ -1,4 +1,4 @@
-﻿using GLPack.DAL;
+using GLPack.DAL;
 using GLPack.Models;
 using GLPack.Services;
 using GLPack.ViewModels.Reports;
@@ -13,19 +13,19 @@ namespace GLPack.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly IReportsService _reports;
+        private readonly ICompanyAccessService _companyAccess;
 
-        public ReportsController(ApplicationDbContext db, IReportsService reports)
+        public ReportsController(ApplicationDbContext db, IReportsService reports, ICompanyAccessService companyAccess)
         {
             _db = db;
             _reports = reports;
+            _companyAccess = companyAccess;
         }
 
         [HttpGet("")]
         public async Task<IActionResult> Index(int companyId, CancellationToken ct)
         {
-            Company? company = await _db.Companies
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Id == companyId, ct);
+            Company? company = await GetAccessibleCompanyAsync(companyId, ct);
 
             if (company == null) return NotFound();
 
@@ -50,9 +50,7 @@ namespace GLPack.Controllers
         [HttpGet("trial-balance.csv")]
         public async Task<IActionResult> TrialBalanceCsv(int companyId, CancellationToken ct)
         {
-            Company? company = await _db.Companies
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Id == companyId, ct);
+            Company? company = await GetAccessibleCompanyAsync(companyId, ct);
 
             if (company == null) return NotFound();
 
@@ -66,9 +64,7 @@ namespace GLPack.Controllers
         [HttpGet("profit-loss.csv")]
         public async Task<IActionResult> ProfitLossCsv(int companyId, CancellationToken ct)
         {
-            Company? company = await _db.Companies
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Id == companyId, ct);
+            Company? company = await GetAccessibleCompanyAsync(companyId, ct);
 
             if (company == null) return NotFound();
 
@@ -82,9 +78,7 @@ namespace GLPack.Controllers
         [HttpGet("balance-sheet.csv")]
         public async Task<IActionResult> BalanceSheetCsv(int companyId, CancellationToken ct)
         {
-            Company? company = await _db.Companies
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Id == companyId, ct);
+            Company? company = await GetAccessibleCompanyAsync(companyId, ct);
 
             if (company == null) return NotFound();
 
@@ -93,6 +87,12 @@ namespace GLPack.Controllers
 
             string fileName = $"BalanceSheet_{company.Name}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
             return File(bytes, "text/csv", fileName);
+        }
+
+        private async Task<Company?> GetAccessibleCompanyAsync(int companyId, CancellationToken ct)
+        {
+            IQueryable<Company> query = _companyAccess.ApplyCompanyAccess(_db.Companies.AsNoTracking(), User);
+            return await query.FirstOrDefaultAsync(c => c.Id == companyId, ct);
         }
     }
 }

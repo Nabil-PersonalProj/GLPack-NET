@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Companies";
     ViewData["Breadcrumb"] = "Companies";
+    bool isAdmin = User.HasClaim("IsAdmin", "True");
 }
 
 <div class="space-y-6">
@@ -10,14 +11,16 @@
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight">Companies</h1>
 
-        <!-- New Company opens modal -->
-        <button id="btnOpenNewCompanyModal"
-                type="button"
-                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium
-                       bg-indigo-600 text-white hover:bg-indigo-500">
-            <i class="fa-solid fa-plus mr-1"></i>
-            New Company
-        </button>
+        @if (isAdmin)
+        {
+            <button id="btnOpenNewCompanyModal"
+                    type="button"
+                    class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium
+                           bg-indigo-600 text-white hover:bg-indigo-500">
+                <i class="fa-solid fa-plus mr-1"></i>
+                New Company
+            </button>
+        }
     </div>
 
     <!-- Search box -->
@@ -65,15 +68,17 @@
                         </div>
                     </a>
 
-                    <!-- Delete button (top-right of card) -->
-                    <button type="button"
-                            data-action="delete-company"
-                            data-company-id="@c.Id"
-                            data-company-name="@c.Name"
-                            class="absolute top-2 right-2 rounded-full bg-red-500/10 text-red-500
-                               opacity-0 group-hover:opacity-100 transition text-[11px] px-2 py-1">
-                        Delete
-                    </button>
+                    @if (isAdmin)
+                    {
+                        <button type="button"
+                                data-action="delete-company"
+                                data-company-id="@c.Id"
+                                data-company-name="@c.Name"
+                                class="absolute top-2 right-2 rounded-full bg-red-500/10 text-red-500
+                                   opacity-0 group-hover:opacity-100 transition text-[11px] px-2 py-1">
+                            Delete
+                        </button>
+                    }
                 </div>
             }
         }
@@ -86,7 +91,8 @@
     </div>
 </div>
 
-<!-- New Company Modal -->
+@if (isAdmin)
+{
 <div id="newCompanyModal"
      class="fixed inset-0 z-50 hidden items-center justify-center">
     <!-- Backdrop -->
@@ -155,6 +161,7 @@
         </div>
     </div>
 </div>
+}
 
 @section Scripts {
     <script>

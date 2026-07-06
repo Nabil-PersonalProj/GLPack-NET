@@ -10,15 +10,29 @@ namespace GLPack.Services
     {
         private readonly ApplicationDbContext _db;
         private readonly IAppLogger _appLogger;
-        public CompaniesService(ApplicationDbContext db, IAppLogger appLogger)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICompanyAccessService _companyAccess;
+
+        public CompaniesService(
+            ApplicationDbContext db,
+            IAppLogger appLogger,
+            IHttpContextAccessor httpContextAccessor,
+            ICompanyAccessService companyAccess)
         {
             _db = db;
             _appLogger = appLogger;
+            _httpContextAccessor = httpContextAccessor;
+            _companyAccess = companyAccess;
         }
 
         public async Task<CompanyDto> CreateAsync(CompanyUpsertDto dto, CancellationToken ct)
         {
-            Company entity = new Company { Name = dto.Name };
+            Company entity = new Company
+            {
+                Name = dto.Name.Trim(),
+                Currency = NormalizeCurrency(dto.Currency),
+                FinancialYearEnd = NormalizeFinancialYearEnd(dto.FinancialYearEnd)
+            };
             _db.Companies.Add(entity);
             await _db.SaveChangesAsync(ct);
             await _appLogger.LogAsync(
@@ -30,23 +44,30 @@ namespace GLPack.Services
                 sourceFile: nameof(CompaniesService),
                 sourceFunction: nameof(CreateAsync),
                 ct: ct);
-            return new CompanyDto { Id = entity.Id, Name = entity.Name };
+            return ToDto(entity);
         }
 
         public async Task<CompanyDto?> GetAsync(int id, CancellationToken ct)
         {
-            Company? c = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-            return c is null ? null : new CompanyDto { Id = c.Id, Name = c.Name };
+            IQueryable<Company> query = _companyAccess.ApplyCompanyAccess(_db.Companies.AsNoTracking(), CurrentUser);
+            Company? c = await query.FirstOrDefaultAsync(x => x.Id == id, ct);
+            return c is null ? null : ToDto(c);
         }
 
         public async Task<IReadOnlyList<CompanyDto>> ListAsync(string? q, int page, int pageSize, CancellationToken ct)
         {
-            IQueryable<Company> query = _db.Companies.AsNoTracking();
+            IQueryable<Company> query = _companyAccess.ApplyCompanyAccess(_db.Companies.AsNoTracking(), CurrentUser);
             if (!string.IsNullOrWhiteSpace(q)) query = query.Where(c => c.Name.Contains(q));
             return await query
                 .OrderBy(c => c.Name)
                 .Skip((page - 1) * pageSize).Take(pageSize)
-                .Select(c => new CompanyDto { Id = c.Id, Name = c.Name })
+                .Select(c => new CompanyDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Currency = c.Currency,
+                    FinancialYearEnd = c.FinancialYearEnd
+                })
                 .ToListAsync(ct);
         }
 
@@ -67,13 +88,15 @@ namespace GLPack.Services
 
                 throw new KeyNotFoundException("Company not found.");
             }
-            c.Name = dto.Name;
+            c.Name = dto.Name.Trim();
+            c.Currency = NormalizeCurrency(dto.Currency);
+            c.FinancialYearEnd = NormalizeFinancialYearEnd(dto.FinancialYearEnd);
             await _db.SaveChangesAsync(ct);
             await _appLogger.LogAsync(
                 eventType: "AUDIT",
                 level: "INFO",
                 logCode: "COMPANY_UPDATE_OK",
-                logMessage: $"Updated company {id} name='{dto.Name}'",
+                logMessage: $"Updated company {id} name='{c.Name}' currency='{c.Currency}' financialYearEnd='{c.FinancialYearEnd}'",
                 companyId: id,
                 sourceFile: nameof(CompaniesService),
                 sourceFunction: nameof(UpdateAsync),
@@ -128,7 +151,7 @@ namespace GLPack.Services
 
         public async Task<IReadOnlyList<CompanyQuickPick>> GetQuickPicksAsync(string? search, int take = 24, CancellationToken ct = default)
         {
-            IQueryable<Company> q = _db.Companies.AsNoTracking();
+            IQueryable<Company> q = _companyAccess.ApplyCompanyAccess(_db.Companies.AsNoTracking(), CurrentUser);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -142,6 +165,32 @@ namespace GLPack.Services
                 .Take(take)
                 .Select(c => new CompanyQuickPick { Id = c.Id, Name = c.Name })
                 .ToListAsync(ct);
+        }
+
+        private System.Security.Claims.ClaimsPrincipal CurrentUser =>
+            _httpContextAccessor.HttpContext?.User ?? new System.Security.Claims.ClaimsPrincipal();
+
+        private static CompanyDto ToDto(Company company)
+        {
+            return new CompanyDto
+            {
+                Id = company.Id,
+                Name = company.Name,
+                Currency = company.Currency,
+                FinancialYearEnd = company.FinancialYearEnd
+            };
+        }
+
+        private static string NormalizeCurrency(string? currency)
+        {
+            string normalized = (currency ?? "SGD").Trim().ToUpperInvariant();
+            return string.IsNullOrWhiteSpace(normalized) ? "SGD" : normalized;
+        }
+
+        private static string NormalizeFinancialYearEnd(string? financialYearEnd)
+        {
+            string normalized = (financialYearEnd ?? "12-31").Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? "12-31" : normalized;
         }
     }
 }

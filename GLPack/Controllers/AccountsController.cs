@@ -1,4 +1,4 @@
-﻿using GLPack.Contracts;
+using GLPack.Contracts;
 using GLPack.DAL;
 using GLPack.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -13,18 +13,26 @@ namespace GLPack.Controllers
         private readonly IAccountsService _svc;
         private readonly ApplicationDbContext _db;
         private readonly IAppLogger _logger;
+        private readonly ICompanyAccessService _companyAccess;
 
-        public AccountsController(IAccountsService svc, ApplicationDbContext db, IAppLogger logger)
+        public AccountsController(
+            IAccountsService svc,
+            ApplicationDbContext db,
+            IAppLogger logger,
+            ICompanyAccessService companyAccess)
         {
             _svc = svc;
             _db = db;
             _logger = logger;
+            _companyAccess = companyAccess;
         }
 
         [HttpGet]
         public async Task<ActionResult<PagedResult<AccountDto>>> List(
             int companyId, string? q, string? accountType, int page = 1, int pageSize = 10, CancellationToken ct = default)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             PagedResult<AccountDto> result = await _svc.ListAsync(companyId, q, accountType, page, pageSize, ct);
             return Ok(result);
         }
@@ -32,6 +40,8 @@ namespace GLPack.Controllers
         [HttpGet("{accountCode}")]
         public async Task<ActionResult<AccountDto>> Get(int companyId, string accountCode, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             var item = await _svc.GetAsync(companyId, accountCode, ct);
             return item is null ? NotFound() : Ok(item);
         }
@@ -39,6 +49,8 @@ namespace GLPack.Controllers
         [HttpPut("{accountCode}")]
         public async Task<IActionResult> Update(int companyId, string accountCode, [FromBody] AccountUpsertDto dto, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             if (dto.CompanyId != companyId)
             {
                 await LogRejectedAsync(
@@ -77,6 +89,8 @@ namespace GLPack.Controllers
         [HttpDelete("{accountCode}")]
         public async Task<IActionResult> Delete(int companyId, string accountCode, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             await _svc.DeleteAsync(companyId, accountCode, ct);
             return NoContent();
         }
@@ -85,6 +99,8 @@ namespace GLPack.Controllers
         public async Task<ActionResult<AccountDto>> CreateFromPrefix(int companyId, [FromBody] AccountCreateFromPrefixDto dto,
             CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             if (dto.CompanyId != companyId)
             {
                 await LogRejectedAsync(
@@ -115,6 +131,8 @@ namespace GLPack.Controllers
         [HttpPost("import")]
         public async Task<ActionResult<AccountImportResult>> Import(int companyId, [FromForm] IFormFile importFile, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             try
             {
                 AccountImportResult result = await _svc.ImportAsync(companyId, importFile, ct);
@@ -133,6 +151,8 @@ namespace GLPack.Controllers
         [HttpGet("prefix-rules")]
         public async Task<ActionResult<IReadOnlyList<AdminPrefixRuleDto>>> GetPrefixRules(int companyId, CancellationToken ct)
         {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
             List<AdminPrefixRuleDto> rules = await _db.AccountTypePrefixes
                 .AsNoTracking()
                 .OrderBy(x => x.Prefix)
@@ -162,6 +182,11 @@ namespace GLPack.Controllers
                 sourceFile: nameof(AccountsController),
                 sourceFunction: sourceFunction,
                 ct: ct);
+        }
+
+        private Task<bool> CanAccessCompanyAsync(int companyId, CancellationToken ct)
+        {
+            return _companyAccess.CanAccessCompanyAsync(User, companyId, ct);
         }
     }
 }
