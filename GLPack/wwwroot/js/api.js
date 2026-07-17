@@ -196,6 +196,10 @@
         });
     }
 
+    function getNextTransactionNo(companyId) {
+        return request(`/api/companies/${companyId}/transactions/next-number`);
+    }
+
     function updateTransaction(companyId, transactionNo, dto) {
         return request(`/api/companies/${companyId}/transactions/${encodeURIComponent(transactionNo)}`, {
             method: "PUT",
@@ -333,6 +337,7 @@
         deleteAccount,
         importAccounts,
         getTransactions,
+        getNextTransactionNo,
         createTransaction,
         updateTransaction,
         deleteTransaction,

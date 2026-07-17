@@ -12,6 +12,16 @@ namespace GLPack.Services
         private readonly IAppLogger _appLogger;
         public TransactionsService(ApplicationDbContext db, IAppLogger appLogger) { _db = db; _appLogger = appLogger; }
 
+        public async Task<int> GetNextTransactionNoAsync(int companyId, CancellationToken ct)
+        {
+            int? maxTransactionNo = await _db.Transactions
+                .AsNoTracking()
+                .Where(t => t.CompanyId == companyId)
+                .MaxAsync(t => (int?)t.TransactionNo, ct);
+
+            return checked((maxTransactionNo ?? 0) + 1);
+        }
+
         public async Task<Tx.TransactionDto> CreateAsync(Tx.TransactionCreateDto dto, CancellationToken ct)
         {
             // Validate Payload

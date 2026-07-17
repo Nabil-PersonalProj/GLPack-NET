@@ -1633,19 +1633,33 @@
 
         // ---------- events ----------
         if (btnNew) {
-            btnNew.addEventListener("click", () => {
-                const newTx = {
-                    transactionNo: getNextTransactionNo(),
-                    txnDate: new Date().toISOString().slice(0, 10),
-                    description: "",
-                    entries: [normalizeEntry({})],
-                    _mode: "new",
-                    _selected: false,
-                    _orig: null
-                };
-                transactions.unshift(newTx);
-                detailPage = 1;
-                startEdit(0, true);
+            btnNew.addEventListener("click", async () => {
+                btnNew.disabled = true;
+
+                try {
+                    const databaseNextNo = Number(await API.getNextTransactionNo(companyId));
+                    const transactionNo = Math.max(
+                        Number.isFinite(databaseNextNo) ? databaseNextNo : 1,
+                        getNextTransactionNo()
+                    );
+
+                    const newTx = {
+                        transactionNo,
+                        txnDate: new Date().toISOString().slice(0, 10),
+                        description: "",
+                        entries: [normalizeEntry({})],
+                        _mode: "new",
+                        _selected: false,
+                        _orig: null
+                    };
+                    transactions.unshift(newTx);
+                    detailPage = 1;
+                    startEdit(0, true);
+                } catch (err) {
+                    showAlert(alertHost, "danger", "Failed to start a new transaction: " + err.message);
+                } finally {
+                    btnNew.disabled = false;
+                }
             });
         }
 

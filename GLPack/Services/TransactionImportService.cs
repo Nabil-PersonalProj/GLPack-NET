@@ -9,6 +9,10 @@ namespace GLPack.Services
 {
     public sealed class TransactionImportService : ITransactionImportService
     {
+        private const int AccountBatchSize = 500;
+        private const int TransactionHeaderBatchSize = 500;
+        private const int TransactionEntryBatchSize = 1000;
+
         private readonly ApplicationDbContext _db;
         private readonly IAppLogger _logger;
 
@@ -211,115 +215,140 @@ namespace GLPack.Services
                 }
             }
 
-            await using IDbContextTransaction dbTx = await _db.Database.BeginTransactionAsync(ct);
-
-            // 1) Ensure accounts exist
-            string[] codes = rows
-                .Select(r => r.AccountCode)
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            List<string> existing = await _db.Accounts
-                .Where(a => a.CompanyId == companyId && codes.Contains(a.Code))
-                .Select(a => a.Code)
-                .ToListAsync(ct);
-
-            string[] missing = codes
-                .Except(existing, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            if (missing.Length > 0)
-            {
-                List<AccountTypePrefix> prefixRules = await _db.AccountTypePrefixes
-                    .AsNoTracking()
-                    .ToListAsync(ct);
-
-                foreach (string code in missing)
-                {
-                    string trimmedCode = code.Trim();
-                    string accountType = ResolveAccountType(trimmedCode, prefixRules);
-
-                    _db.Accounts.Add(new Account
-                    {
-                        CompanyId = companyId,
-                        Code = trimmedCode,
-                        Name = trimmedCode,
-                        Type = accountType
-                    });
-                }
-
-                await _db.SaveChangesAsync(ct);
-            }
-
-            // 2) Allocate new TransactionNos
-            int maxTxnNo = await _db.Transactions
-                .Where(t => t.CompanyId == companyId)
-                .Select(t => (int?)t.TransactionNo)
-                .MaxAsync(ct) ?? 0;
-
             List<string> orderedDistinctKeys = rows
                 .Select(r => Key(r.DateUtc, r.SourceTrxNo))
                 .Distinct()
                 .ToList();
 
-            Dictionary<string, int> map = new Dictionary<string, int>(StringComparer.Ordinal);
-            int next = maxTxnNo + 1;
+            await using IDbContextTransaction dbTx = await _db.Database.BeginTransactionAsync(ct);
+            bool originalAutoDetectChanges = _db.ChangeTracker.AutoDetectChangesEnabled;
 
-            foreach (string k in orderedDistinctKeys)
-                map[k] = next++;
-
-            // 3) Insert headers + lines
-            // Create headers, one per distinct key
-            List<Transaction> headers = new List<Transaction>(orderedDistinctKeys.Count);
-
-            foreach (string k in orderedDistinctKeys)
+            try
             {
-                // Parse date back out of key, safe because we created the key.
-                string datePart = k.Split('|', 2)[0];
+                _db.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                DateTime dt = DateTime.ParseExact(
-                    datePart,
-                    "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal);
+                // 1) Ensure accounts exist
+                string[] codes = rows
+                    .Select(r => r.AccountCode)
+                    .Where(c => !string.IsNullOrWhiteSpace(c))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
-                dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                List<string> existing = await _db.Accounts
+                    .Where(a => a.CompanyId == companyId && codes.Contains(a.Code))
+                    .Select(a => a.Code)
+                    .ToListAsync(ct);
 
-                headers.Add(new Transaction
+                string[] missing = codes
+                    .Except(existing, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+                if (missing.Length > 0)
                 {
-                    CompanyId = companyId,
-                    TransactionNo = map[k],
-                    Date = dt,
-                    Description = null
-                });
+                    List<AccountTypePrefix> prefixRules = await _db.AccountTypePrefixes
+                        .AsNoTracking()
+                        .ToListAsync(ct);
+
+                    foreach (string[] batch in missing.Chunk(AccountBatchSize))
+                    {
+                        List<Account> accounts = new List<Account>(batch.Length);
+
+                        foreach (string code in batch)
+                        {
+                            string trimmedCode = code.Trim();
+                            string accountType = ResolveAccountType(trimmedCode, prefixRules);
+
+                            accounts.Add(new Account
+                            {
+                                CompanyId = companyId,
+                                Code = trimmedCode,
+                                Name = trimmedCode,
+                                Type = accountType
+                            });
+                        }
+
+                        _db.Accounts.AddRange(accounts);
+                        await _db.SaveChangesAsync(ct);
+                        _db.ChangeTracker.Clear();
+                    }
+                }
+
+                // 2) Allocate new TransactionNos
+                int maxTxnNo = await _db.Transactions
+                    .Where(t => t.CompanyId == companyId)
+                    .Select(t => (int?)t.TransactionNo)
+                    .MaxAsync(ct) ?? 0;
+
+                Dictionary<string, int> map = new Dictionary<string, int>(StringComparer.Ordinal);
+                int next = maxTxnNo + 1;
+
+                foreach (string k in orderedDistinctKeys)
+                    map[k] = next++;
+
+                // 3) Insert headers + lines in batches while the transaction stays all-or-nothing.
+                foreach (string[] batch in orderedDistinctKeys.Chunk(TransactionHeaderBatchSize))
+                {
+                    List<Transaction> headers = new List<Transaction>(batch.Length);
+
+                    foreach (string k in batch)
+                    {
+                        // Parse date back out of key, safe because we created the key.
+                        string datePart = k.Split('|', 2)[0];
+
+                        DateTime dt = DateTime.ParseExact(
+                            datePart,
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.AssumeUniversal);
+
+                        dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+
+                        headers.Add(new Transaction
+                        {
+                            CompanyId = companyId,
+                            TransactionNo = map[k],
+                            Date = dt,
+                            Description = null
+                        });
+                    }
+
+                    _db.Transactions.AddRange(headers);
+                    await _db.SaveChangesAsync(ct);
+                    _db.ChangeTracker.Clear();
+                }
+
+                foreach (ImportRow[] batch in rows.Chunk(TransactionEntryBatchSize))
+                {
+                    List<TransactionEntry> lines = new List<TransactionEntry>(batch.Length);
+
+                    foreach (ImportRow r in batch)
+                    {
+                        string k = Key(r.DateUtc, r.SourceTrxNo);
+
+                        lines.Add(new TransactionEntry
+                        {
+                            CompanyId = companyId,
+                            TransactionNo = map[k],
+                            AccountCode = r.AccountCode,
+                            LineDescription = string.IsNullOrWhiteSpace(r.Particular) ? null : r.Particular,
+                            Debit = r.Debit,
+                            Credit = r.Credit,
+                            HasError = r.HasError
+                        });
+                    }
+
+                    _db.TransactionEntries.AddRange(lines);
+                    await _db.SaveChangesAsync(ct);
+                    _db.ChangeTracker.Clear();
+                }
+
+                await dbTx.CommitAsync(ct);
             }
-
-            _db.Transactions.AddRange(headers);
-            await _db.SaveChangesAsync(ct);
-
-            // Create lines
-            List<TransactionEntry> lines = new List<TransactionEntry>(rows.Count);
-
-            foreach (ImportRow r in rows)
+            finally
             {
-                string k = Key(r.DateUtc, r.SourceTrxNo);
-
-                lines.Add(new TransactionEntry
-                {
-                    CompanyId = companyId,
-                    TransactionNo = map[k],
-                    AccountCode = r.AccountCode,
-                    LineDescription = string.IsNullOrWhiteSpace(r.Particular) ? null : r.Particular,
-                    Debit = r.Debit,
-                    Credit = r.Credit,
-                    HasError = r.HasError
-                });
+                _db.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
+                _db.ChangeTracker.Clear();
             }
-
-            _db.TransactionEntries.AddRange(lines);
-            await _db.SaveChangesAsync(ct);
-            await dbTx.CommitAsync(ct);
 
             await _logger.LogAsync(
                 eventType: "AUDIT",
@@ -571,6 +600,18 @@ namespace GLPack.Services
                 return;
             }
 
+            if (!HasAlphabeticPrefix(ledger))
+            {
+                skipped.Add(new SkippedImportLine(lineNumber, "Ledger account code must start with an alphabetic prefix.", originalText));
+                return;
+            }
+
+            if (!IsPrefixNumberAccountCode(ledger))
+            {
+                skipped.Add(new SkippedImportLine(lineNumber, "Ledger account code must use an alphabetic prefix followed by a number.", originalText));
+                return;
+            }
+
             if (!TryParseImportDate(dateStr, out DateTime dt))
             {
                 skipped.Add(new SkippedImportLine(lineNumber, "Invalid date.", originalText));
@@ -721,6 +762,39 @@ namespace GLPack.Services
                 return code;
 
             return $"{prefix}{number:000}";
+        }
+
+        private static bool HasAlphabeticPrefix(string accountCode)
+        {
+            return accountCode.Length > 0 && IsAsciiUpperLetter(accountCode[0]);
+        }
+
+        private static bool IsPrefixNumberAccountCode(string accountCode)
+        {
+            int index = 0;
+
+            while (index < accountCode.Length && IsAsciiUpperLetter(accountCode[index]))
+            {
+                index++;
+            }
+
+            if (index == 0 || index == accountCode.Length)
+                return false;
+
+            while (index < accountCode.Length)
+            {
+                if (!char.IsDigit(accountCode[index]))
+                    return false;
+
+                index++;
+            }
+
+            return true;
+        }
+
+        private static bool IsAsciiUpperLetter(char value)
+        {
+            return value >= 'A' && value <= 'Z';
         }
 
         private static string ResolveAccountType(string accountCode, List<AccountTypePrefix> prefixRules)

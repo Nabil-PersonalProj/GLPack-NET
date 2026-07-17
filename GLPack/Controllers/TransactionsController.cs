@@ -56,6 +56,14 @@ namespace GLPack.Controllers
             return item is null ? NotFound() : Ok(item);
         }
 
+        [HttpGet("next-number")]
+        public async Task<ActionResult<int>> GetNextNumber(int companyId, CancellationToken ct)
+        {
+            if (!await CanAccessCompanyAsync(companyId, ct)) return NotFound();
+
+            return Ok(await _svc.GetNextTransactionNoAsync(companyId, ct));
+        }
+
         [HttpPost]
         public async Task<ActionResult<Tx.TransactionDto>> Create(
             int companyId,
